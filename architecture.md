@@ -213,3 +213,4 @@ docker compose --profile ingest run --rm ingest
 | **SSE over WebSocket** | Simpler server-side (no upgrade handshake); no bidirectional need; reconnection handled by browser EventSource |
 | **Ollama mandatory** | Embeddings always use Ollama (nomic-embed-text); this simplifies the embedding pipeline but requires Ollama to be running even if using Groq/Anthropic for inference |
 | **npm workspaces (monorepo)** | Shared devDependencies; single `npm install`; slight complexity in Docker builds (each service has its own package.json) |
+

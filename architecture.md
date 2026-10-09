@@ -217,3 +217,8 @@ docker compose --profile ingest run --rm ingest
 
 
 
+
+## Observability & Health
+- **Logging:** Structured JSON logs via structlog (Python) and pino (Node).
+- **Deep Health:** /health endpoint checks DB connectivity, Agent availability, Ollama responsiveness, Index size (mocked), and API key presence boolean.
+- **Resilience:** Graceful failures with retry hints for 502/503.

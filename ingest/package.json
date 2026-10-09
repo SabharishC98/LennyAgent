@@ -1,0 +1,30 @@
+{
+  "name": "@lenny/ingest",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx src/ingest.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/ingest.js",
+    "ingest": "tsx src/ingest.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint src --ext .ts"
+  },
+  "dependencies": {
+    "pg": "^8.11.5",
+    "pino": "^9.2.0",
+    "pino-pretty": "^11.2.1",
+    "glob": "^11.0.0",
+    "uuid": "^10.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.5",
+    "tsx": "^4.11.0",
+    "vitest": "^1.6.0",
+    "@types/node": "^20.14.0",
+    "@types/pg": "^8.11.5",
+    "@types/uuid": "^10.0.0"
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "name": "lenny-growth-assistant",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "agent",
+    "ingest",
+    "web"
+  ],
+  "scripts": {
+    "install:all": "npm install",
+    "build": "npm run build --workspaces",
+    "test": "npm run test --workspaces",
+    "lint": "npm run lint --workspaces --if-present"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.5"
+  }
+}

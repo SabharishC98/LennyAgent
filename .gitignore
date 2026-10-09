@@ -1,0 +1,54 @@
+# Environment secrets - NEVER commit .env
+.env
+*.env.local
+*.env.*.local
+
+# Node
+node_modules/
+dist/
+.next/
+build/
+*.tsbuildinfo
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+
+# Docker volumes
+pgdata/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Coverage
+coverage/
+.nyc_output/
+htmlcov/
+
+# Playwright
+test-results/
+playwright-report/
+
+# Secrets and credentials (extra safety)
+*.pem
+*.key
+secrets/

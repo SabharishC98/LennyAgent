@@ -1,0 +1,111 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test-api:
+    name: API Tests (pytest)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+      - name: Run pytest
+        env:
+          # No real API keys in CI — tests use fixtures only
+          LLM_PROVIDER: ollama
+          GROQ_API_KEY: ""
+          ANTHROPIC_API_KEY: ""
+          DATABASE_URL: postgresql://lenny:lenny@localhost:5432/lenny
+          AGENT_URL: http://localhost:8001
+        run: python -m pytest tests/ -v
+
+  test-agent:
+    name: Agent Tests (Vitest)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: agent
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: package-lock.json
+      - name: Install dependencies
+        working-directory: .
+        run: npm install
+      - name: Run Vitest
+        env:
+          LLM_PROVIDER: ollama
+          GROQ_API_KEY: ""
+        run: npm test
+
+  test-ingest:
+    name: Ingest Tests (Vitest)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ingest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: package-lock.json
+      - name: Install dependencies
+        working-directory: .
+        run: npm install
+      - name: Run Vitest
+        run: npm test
+
+  test-web:
+    name: Web Tests (Vitest)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: package-lock.json
+      - name: Install dependencies
+        working-directory: .
+        run: npm install
+      - name: Run Vitest
+        run: npm test
+
+  lint-check:
+    name: Repo Safety Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check .env is not committed
+        run: |
+          if git ls-files | grep -q '^.env$'; then
+            echo "ERROR: .env file is committed! Remove it immediately."
+            exit 1
+          fi
+          echo ".env is not committed (good)."
+      - name: Check .env.example has no secrets
+        run: |
+          if grep -E '(GROQ_API_KEY|ANTHROPIC_API_KEY)=.+' .env.example; then
+            echo "ERROR: .env.example contains non-empty secret values!"
+            exit 1
+          fi
+          echo ".env.example secret values are empty (good)."

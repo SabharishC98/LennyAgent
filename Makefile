@@ -64,6 +64,5 @@ refresh:
 
 eval:
 	@echo "Running evaluation harness..."
-	@echo "NOTE: Evaluation harness not yet implemented (Phase 7)."
-	@echo "BLOCKED: Requires Phase 7 implementation."
-	exit 1
+	cd agent && npx tsx src/eval.ts
+

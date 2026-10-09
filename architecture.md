@@ -214,3 +214,4 @@ docker compose --profile ingest run --rm ingest
 | **Ollama mandatory** | Embeddings always use Ollama (nomic-embed-text); this simplifies the embedding pipeline but requires Ollama to be running even if using Groq/Anthropic for inference |
 | **npm workspaces (monorepo)** | Shared devDependencies; single `npm install`; slight complexity in Docker builds (each service has its own package.json) |
 
+

@@ -215,3 +215,4 @@ docker compose --profile ingest run --rm ingest
 | **npm workspaces (monorepo)** | Shared devDependencies; single `npm install`; slight complexity in Docker builds (each service has its own package.json) |
 
 
+

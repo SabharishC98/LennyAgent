@@ -67,11 +67,12 @@ app.post('/agent/run', async (req: any, reply) => {
   reply.raw.setHeader('Cache-Control', 'no-cache');
   reply.raw.setHeader('Connection', 'keep-alive');
 
+  // Send raw markdown as the artifact — the frontend handles rendering
   const chunkPayload = JSON.stringify({
     text: responseText,
     intent,
     provider: providerChain[0]?.name || 'ollama',
-    artifact: intent === 'essay' ? `<h1>Ship 30 Essay</h1><p>${responseText.replace(/\n\n/g, '</p><p>')}</p>` : null
+    artifact: intent === 'essay' ? responseText : null
   });
 
   reply.raw.write(`data: ${chunkPayload}\n\n`);

@@ -1,11 +1,61 @@
 import React, { useState } from 'react';
 import DOMPurify from 'dompurify';
 
+// Converts common Markdown syntax into clean HTML
+function markdownToHtml(md: string): string {
+  // If it already contains HTML tags, return directly
+  if (/<[a-z][\s\S]*>/i.test(md)) {
+    return md;
+  }
+
+  let html = md
+    // Escape HTML special chars
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    // Headings
+    .replace(/^### (.*$)/gim, '<h3>$1</h3>')
+    .replace(/^## (.*$)/gim, '<h2>$1</h2>')
+    .replace(/^# (.*$)/gim, '<h1>$1</h1>')
+    // Bold and italics
+    .replace(/\*\*\*(.*?)\*\*\*/gim, '<strong><em>$1</em></strong>')
+    .replace(/\*\*(.*?)\*\*/gim, '<strong>$1</strong>')
+    .replace(/\*(.*?)\*/gim, '<em>$1</em>')
+    // Blockquotes
+    .replace(/^\> (.*$)/gim, '<blockquote>$1</blockquote>')
+    // Inline code
+    .replace(/`([^`]+)`/gim, '<code>$1</code>')
+    // Bullet lists
+    .replace(/^\s*[-*]\s+(.*$)/gim, '<li>$1</li>');
+
+  // Wrap lists in <ul>
+  html = html.replace(/(<li>[\s\S]*?<\/li>)/gim, '<ul>$1</ul>');
+
+  // Paragraphs for remaining text blocks
+  html = html
+    .split(/\n\s*\n/)
+    .map(block => {
+      block = block.trim();
+      if (!block) return '';
+      if (/^<(h[1-6]|ul|ol|blockquote|pre)/i.test(block)) {
+        return block;
+      }
+      return `<p>${block.replace(/\n/g, '<br/>')}</p>`;
+    })
+    .join('\n');
+
+  return html;
+}
+
 export const ArtifactViewer = ({ content }: { content: string }) => {
   const [activeTab, setActiveTab] = useState<'preview' | 'code'>('preview');
   const [copied, setCopied] = useState(false);
 
-  const sanitized = DOMPurify.sanitize(content, { USE_PROFILES: { html: true } });
+  // 1. Transform markdown to HTML if markdown is detected
+  const parsedHtml = markdownToHtml(content);
+
+  // 2. Sanitize through DOMPurify for strict defense-in-depth security
+  const sanitized = DOMPurify.sanitize(parsedHtml, { USE_PROFILES: { html: true } });
 
   const iframeSrc = `
     <!DOCTYPE html>
@@ -18,20 +68,23 @@ export const ArtifactViewer = ({ content }: { content: string }) => {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             color: #1f2937;
             line-height: 1.6;
-            padding: 16px;
+            padding: 20px;
             margin: 0;
             background-color: #ffffff;
           }
           h1, h2, h3 { color: #111827; margin-top: 1.2em; margin-bottom: 0.6em; }
           h1 { font-size: 1.5rem; border-bottom: 1px solid #e5e7eb; padding-bottom: 8px; }
           h2 { font-size: 1.25rem; }
+          h3 { font-size: 1.1rem; }
           p { margin: 0.8em 0; }
-          strong { color: #000; }
-          ul, ol { padding-left: 20px; }
+          strong { color: #111827; }
+          em { color: #374151; }
+          ul, ol { padding-left: 24px; margin: 0.8em 0; }
           li { margin-bottom: 4px; }
+          blockquote { border-left: 3px solid #3b82f6; padding-left: 12px; margin-left: 0; color: #4b5563; font-style: italic; }
           pre, code { background: #f3f4f6; border-radius: 4px; font-family: monospace; }
           pre { padding: 12px; overflow-x: auto; }
-          code { padding: 2px 4px; }
+          code { padding: 2px 4px; color: #dc2626; }
         </style>
       </head>
       <body>${sanitized}</body>
@@ -45,11 +98,14 @@ export const ArtifactViewer = ({ content }: { content: string }) => {
   };
 
   const handleDownload = () => {
-    const blob = new Blob([content], { type: 'text/html' });
+    const isHtml = /<[a-z][\s\S]*>/i.test(content);
+    const extension = isHtml ? 'html' : 'md';
+    const mimeType = isHtml ? 'text/html' : 'text/markdown';
+    const blob = new Blob([content], { type: mimeType });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'artifact.html';
+    a.download = `artifact.${extension}`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -92,7 +148,7 @@ export const ArtifactViewer = ({ content }: { content: string }) => {
           <button
             onClick={handleDownload}
             className="text-xs text-gray-400 hover:text-white bg-gray-800 hover:bg-gray-700 px-2.5 py-1 rounded border border-gray-700 transition"
-            title="Download as HTML"
+            title="Download file"
           >
             Download
           </button>

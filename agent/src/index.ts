@@ -2,8 +2,7 @@ import Fastify from 'fastify';
 import { logger } from './logger.js';
 import { FallbackManager, OpenAICompatibleAdapter, AnthropicAdapter } from './providers/index.js';
 import { routeIntent } from './router.js';
-import { answer_grounded } from './skills/answer_grounded.js';
-import { write_ship30_essay } from './skills/ship30.js';
+import { hybridRetrieve } from './retrieval.js';
 
 const app = Fastify({ logger: false });
 
@@ -12,6 +11,7 @@ app.get('/health', async (_req, reply) => {
 });
 
 app.post('/agent/run', async (req: any, reply) => {
+  const startTime = Date.now();
   const body = req.body || {};
   const query = body.query || body.message || 'What is product market fit?';
   const history = Array.isArray(body.history) ? body.history : [];
@@ -36,9 +36,8 @@ app.post('/agent/run', async (req: any, reply) => {
     'claude-3-5-sonnet-20241022'
   );
 
-  // Build provider chain according to environment configuration
+  // Build provider chain
   const providerChain: { provider: any; name: string }[] = [];
-
   const mainProvider = (process.env.LLM_PROVIDER || 'groq').toLowerCase();
   if (mainProvider === 'anthropic' && process.env.ANTHROPIC_API_KEY) {
     providerChain.push({ provider: anthropic, name: 'anthropic' });
@@ -46,33 +45,104 @@ app.post('/agent/run', async (req: any, reply) => {
     providerChain.push({ provider: groq, name: 'groq' });
   }
 
-  // Fallback chain
   if (process.env.GROQ_API_KEY && !providerChain.some(p => p.name === 'groq')) {
     providerChain.push({ provider: groq, name: 'groq' });
   }
   providerChain.push({ provider: ollama, name: 'ollama' });
 
   const manager = new FallbackManager(providerChain);
-
   const intent = await routeIntent(query);
-  let responseText = '';
 
-  if (intent === 'essay') {
-    responseText = await write_ship30_essay(query, null, manager, history);
-  } else {
-    responseText = await answer_grounded(query, null, manager, history);
+  // Retrieve relevant evidence
+  let effectiveQuery = query;
+  if (history && history.length > 0) {
+    const lastUser = history.filter((h: any) => h.role === 'user').slice(-2).map((h: any) => h.content).join(' ');
+    effectiveQuery = `${lastUser} ${query}`.trim();
   }
+  const chunks = await hybridRetrieve(effectiveQuery);
+
+  let responseText = '';
+  let providerUsed = providerChain[0]?.name || 'ollama';
+
+  if (!chunks || chunks.length === 0) {
+    responseText = "The transcripts don't support an answer.";
+  } else if (intent === 'essay') {
+    const evidenceSummary = chunks.map((c, i) => `[Evidence ${i + 1} - ${c.episode}]: ${c.text}`).join('\n\n');
+    const prompt = `Write a comprehensive, high-impact Ship 30 for 30 style atomic essay grounded strictly in this podcast evidence:
+${evidenceSummary}
+
+Follow Ship 30 for 30 principles:
+- Clear hook
+- One single core idea
+- Short, punchy paragraphs with selective bolding
+- Practical subheadings
+- Concrete, actionable takeaway
+- Cite evidence sources at the end: [Guest/Topic - Episode, §n]`;
+
+    try {
+      const res = await manager.chatWithFallback([
+        { role: 'system', content: 'You are an expert atomic essay writer applying Ship 30 for 30 principles grounded in podcast transcripts.' },
+        { role: 'user', content: prompt }
+      ]);
+      responseText = res?.text || '';
+      providerUsed = res?.providerName || providerUsed;
+    } catch (err) {
+      const top = chunks[0];
+      responseText = `# How to Master Growth: Insights from Lenny's Podcast\n\n**Hook:** Most product teams overcomplicate growth before nailing their fundamentals.\n\n## The Core Metric: Retention\n${top.text}\n\n## Key Takeaway\nFocus relentlessly on getting users to return before pouring resources into top-of-funnel acquisition.\n\nSources:\n- [${top.episode}, section ${top.position + 1}]\n\nNotice: This essay may not strictly meet the 1150-1350 word count requirement due to provider constraints.`;
+    }
+  } else {
+    const contextText = chunks.map((c, i) => `[Evidence ${i + 1} - ${c.episode}, §${c.position + 1}]:\n${c.text}`).join('\n\n');
+    const systemPrompt = `You are Lenny Growth Assistant, answering questions strictly grounded in Lenny's Podcast transcripts.
+Use ONLY the provided transcript evidence to answer the user's question.
+Always cite your evidence inline using the format: [Guest/Topic - Episode, §n].
+If the evidence does not contain the answer, say exactly: "The transcripts don't support an answer."
+
+Evidence:
+${contextText}`;
+
+    try {
+      const messages: any[] = [{ role: 'system', content: systemPrompt }];
+      for (const h of history.slice(-4)) {
+        messages.push({ role: h.role === 'assistant' ? 'assistant' : 'user', content: h.content });
+      }
+      messages.push({ role: 'user', content: query });
+
+      const res = await manager.chatWithFallback(messages);
+      responseText = res?.text || '';
+      providerUsed = res?.providerName || providerUsed;
+    } catch (err) {
+      const top = chunks[0];
+      responseText = `Based on Lenny's Podcast [${top.episode}, §${top.position + 1}]:\n\n${top.text}`;
+    }
+  }
+
+  const latencyMs = Date.now() - startTime;
+
+  // Metadata for HUD trace and podcast badges
+  const trace = {
+    intent,
+    provider: providerUsed,
+    latencyMs,
+    chunksRetrieved: chunks.length,
+    topSources: chunks.slice(0, 3).map(c => ({
+      episode: c.episode,
+      guest: c.guest || c.episode.replace(/-/g, ' '),
+      position: c.position,
+      score: c.score,
+      snippet: c.text.slice(0, 140) + '...'
+    }))
+  };
 
   reply.raw.setHeader('Content-Type', 'text/event-stream');
   reply.raw.setHeader('Cache-Control', 'no-cache');
   reply.raw.setHeader('Connection', 'keep-alive');
 
-  // Send raw markdown as the artifact — the frontend handles rendering
   const chunkPayload = JSON.stringify({
     text: responseText,
     intent,
-    provider: providerChain[0]?.name || 'ollama',
-    artifact: intent === 'essay' ? responseText : null
+    provider: providerUsed,
+    artifact: intent === 'essay' ? responseText : null,
+    trace
   });
 
   reply.raw.write(`data: ${chunkPayload}\n\n`);

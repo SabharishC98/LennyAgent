@@ -41,10 +41,17 @@ export const ArtifactViewer = ({ content }: { content: string }) => {
   const [activeTab, setActiveTab] = useState<'preview' | 'code'>('preview');
   const [copied, setCopied] = useState(false);
 
+  // Compute live Ship 30 scorecard metrics
+  const wordCount = content.trim().split(/\s+/).filter(Boolean).length;
+  const readingTimeMin = Math.max(1, Math.ceil(wordCount / 225));
+  const hasHook = /hook/i.test(content) || /^\*\*[^*]+\*\*/m.test(content);
+  const hasHeadings = /^#{1,3}\s/m.test(content) || /<h[1-3]>/i.test(content);
+  const hasTakeaway = /takeaway|conclusion|action/i.test(content);
+  const hasCitations = /\[|§|sources/i.test(content);
+
   const parsedHtml = markdownToHtml(content);
   const sanitized = DOMPurify.sanitize(parsedHtml, { USE_PROFILES: { html: true } });
 
-  // Minimalist #F5F5F5 / crisp dark slate typography
   const iframeSrc = `
     <!DOCTYPE html>
     <html>
@@ -58,7 +65,7 @@ export const ArtifactViewer = ({ content }: { content: string }) => {
             color: #171717;
             line-height: 1.7;
             font-size: 16.5px;
-            padding: 32px 28px;
+            padding: 28px 24px;
             margin: 0;
             background-color: #F5F5F5;
           }
@@ -120,8 +127,39 @@ export const ArtifactViewer = ({ content }: { content: string }) => {
 
   return (
     <div className="artifact-viewer w-full h-full flex flex-col bg-surface-900 border border-neutral-800/80 rounded-xl overflow-hidden shadow-2xl">
-      {/* Tab controls */}
-      <div className="tabs bg-surface-950/90 px-4 py-2.5 border-b border-neutral-800/80 flex items-center justify-between backdrop-blur">
+      {/* 1. Live Ship 30 Quality Scorecard Header */}
+      <div className="scorecard bg-neutral-900/95 border-b border-neutral-800 px-4 py-2 flex flex-wrap items-center justify-between text-[11px] text-neutral-300 gap-2">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1.5 font-mono">
+            <span className="text-neutral-400">Words:</span>
+            <span className={`font-semibold ${wordCount >= 100 ? 'text-[#F5F5F5]' : 'text-neutral-400'}`}>
+              {wordCount.toLocaleString()}
+            </span>
+          </div>
+          <span className="text-neutral-700">|</span>
+          <div className="flex items-center gap-1 text-neutral-400 font-mono">
+            <span>⏱</span> {readingTimeMin} min read
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 text-[10px]">
+          <span className={`px-1.5 py-0.5 rounded ${hasHook ? 'bg-neutral-800 text-[#F5F5F5]' : 'text-neutral-600'}`}>
+            {hasHook ? '✓ Hook' : '○ Hook'}
+          </span>
+          <span className={`px-1.5 py-0.5 rounded ${hasHeadings ? 'bg-neutral-800 text-[#F5F5F5]' : 'text-neutral-600'}`}>
+            {hasHeadings ? '✓ Structure' : '○ Structure'}
+          </span>
+          <span className={`px-1.5 py-0.5 rounded ${hasTakeaway ? 'bg-neutral-800 text-[#F5F5F5]' : 'text-neutral-600'}`}>
+            {hasTakeaway ? '✓ Takeaway' : '○ Takeaway'}
+          </span>
+          <span className={`px-1.5 py-0.5 rounded ${hasCitations ? 'bg-neutral-800 text-[#F5F5F5]' : 'text-neutral-600'}`}>
+            {hasCitations ? '✓ Grounded' : '○ Grounded'}
+          </span>
+        </div>
+      </div>
+
+      {/* 2. Tab and Export Controls */}
+      <div className="tabs bg-surface-950/90 px-4 py-2 border-b border-neutral-800/80 flex items-center justify-between backdrop-blur">
         <div className="flex gap-1.5 p-0.5 bg-neutral-900 rounded-lg border border-neutral-800">
           <button
             onClick={() => setActiveTab('preview')}
@@ -158,12 +196,12 @@ export const ArtifactViewer = ({ content }: { content: string }) => {
             className="text-xs text-neutral-400 hover:text-[#F5F5F5] bg-neutral-900 hover:bg-neutral-850 px-2.5 py-1 rounded-md border border-neutral-800 transition"
             title="Download file"
           >
-            Download
+            Export
           </button>
         </div>
       </div>
 
-      {/* Content panel */}
+      {/* 3. Rendered Content */}
       <div className="flex-1 overflow-hidden relative bg-[#F5F5F5]">
         {activeTab === 'preview' ? (
           <iframe

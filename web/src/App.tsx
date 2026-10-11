@@ -1,16 +1,42 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ArtifactViewer } from './components/ArtifactViewer';
 
+interface SourceMeta {
+  episode: string;
+  guest: string;
+  position: number;
+  score: number;
+  snippet: string;
+}
+
+interface TraceMeta {
+  intent: string;
+  provider: string;
+  latencyMs: number;
+  chunksRetrieved: number;
+  topSources: SourceMeta[];
+}
+
 interface Message {
   id: string;
   role: 'user' | 'assistant';
   content: string;
+  trace?: TraceMeta;
 }
 
 interface Session {
   id: string;
   title: string;
 }
+
+// Concept 4: Curated Lenny Growth Radar Topics
+const CURATED_TOPICS = [
+  { label: '🚀 Growth Loops vs Funnels', prompt: 'Explain the difference between growth loops and traditional funnels from Lenny\'s guests like Elena Verna.' },
+  { label: '🎯 Rahul Vohra\'s PMF Engine', prompt: 'How does Rahul Vohra\'s Superhuman engine algorithmically measure and optimize product market fit?' },
+  { label: '👑 Founder Mode', prompt: 'What did Brian Chesky say about founder mode and maintaining hands-on product details?' },
+  { label: '📈 B2B Retention Benchmarks', prompt: 'What are the key B2B SaaS retention benchmarks discussed across Lenny\'s podcast episodes?' },
+  { label: '✍️ Ship 30 Essay: Netflix Culture', prompt: 'Write a Ship 30 essay about how Netflix builds a culture of excellence from Elizabeth Stone.' }
+];
 
 function App() {
   const [sessions, setSessions] = useState<Session[]>([{ id: 'default', title: 'Welcome Session' }]);
@@ -27,10 +53,10 @@ function App() {
   });
 
   const [sessionArtifacts, setSessionArtifacts] = useState<Record<string, string | null>>({});
-
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [config, setConfig] = useState({ provider: 'groq', model: 'openai/gpt-oss-120b' });
+  const [activeTraceId, setActiveTraceId] = useState<string | null>(null);
   const [selectedCitation, setSelectedCitation] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -69,9 +95,8 @@ function App() {
     setCurrentSessionId(newId);
   };
 
-  const handleSendMessage = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    const query = input.trim();
+  const handleSendMessage = async (customQuery?: string) => {
+    const query = (typeof customQuery === 'string' ? customQuery : input).trim();
     if (!query || loading) return;
 
     const userMsg: Message = { id: `user-${Date.now()}`, role: 'user', content: query };
@@ -116,6 +141,7 @@ function App() {
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let assistantText = '';
+      let traceMeta: TraceMeta | undefined = undefined;
       const assistantMsgId = `assistant-${Date.now()}`;
 
       setSessionMessages(prev => ({
@@ -142,13 +168,16 @@ function App() {
               const payload = JSON.parse(rawData);
               if (payload.text) {
                 assistantText += payload.text;
-                setSessionMessages(prev => ({
-                  ...prev,
-                  [targetSessionId]: (prev[targetSessionId] || []).map(m =>
-                    m.id === assistantMsgId ? { ...m, content: assistantText } : m
-                  )
-                }));
               }
+              if (payload.trace) {
+                traceMeta = payload.trace;
+              }
+              setSessionMessages(prev => ({
+                ...prev,
+                [targetSessionId]: (prev[targetSessionId] || []).map(m =>
+                  m.id === assistantMsgId ? { ...m, content: assistantText, trace: traceMeta } : m
+                )
+              }));
               if (payload.artifact) {
                 setSessionArtifacts(prev => ({
                   ...prev,
@@ -186,7 +215,6 @@ function App() {
     <div className="min-h-screen bg-surface-950 text-[#F5F5F5] flex flex-col md:flex-row h-screen overflow-hidden selection:bg-[#F5F5F5] selection:text-black font-sans">
       {/* 1. Left Sidebar: Sessions */}
       <div className="session-list w-full md:w-64 border-r border-neutral-800/80 p-4 flex flex-col bg-surface-900">
-        {/* Brand Header */}
         <div className="flex items-center gap-2 px-1 mb-5">
           <div className="w-2 h-2 rounded-full bg-[#F5F5F5] shadow-[0_0_8px_rgba(245,245,245,0.4)]" />
           <span className="text-xs font-medium tracking-wider uppercase text-neutral-400">Lenny Assistant</span>
@@ -225,7 +253,7 @@ function App() {
           <div className="flex items-center gap-3">
             <h1 className="text-sm font-semibold tracking-tight text-[#F5F5F5]">Transcripts Knowledge Base</h1>
             <span className="text-[10px] bg-neutral-800/80 border border-neutral-700/60 text-neutral-400 px-2 py-0.5 rounded-full font-mono">
-              7,500+ chunks
+              7,500+ chunks indexed
             </span>
           </div>
           <div className="badge bg-neutral-900 border border-neutral-800 px-2.5 py-1 rounded-md text-[11px] font-mono text-neutral-400">
@@ -233,47 +261,107 @@ function App() {
           </div>
         </header>
 
+        {/* Message Stream */}
         <div className="messages flex-1 overflow-y-auto p-6 space-y-5">
-          {currentMessages.map(m => (
-            <div
-              key={m.id}
-              className={`flex flex-col ${m.role === 'user' ? 'items-end' : 'items-start'}`}
-            >
+          {currentMessages.map(m => {
+            const hasTrace = !!m.trace;
+            const isTraceOpen = activeTraceId === m.id;
+
+            return (
               <div
-                className={`max-w-2xl px-4 py-3.5 rounded-xl text-[13.5px] leading-relaxed ${
-                  m.role === 'user'
-                    ? 'bg-neutral-800 text-[#F5F5F5] border border-neutral-700 shadow-sm'
-                    : 'bg-surface-900 border border-neutral-800/90 text-neutral-200 shadow-sm'
-                }`}
+                key={m.id}
+                className={`flex flex-col ${m.role === 'user' ? 'items-end' : 'items-start'}`}
               >
-                <div className="whitespace-pre-wrap">{m.content || (loading && m.role === 'assistant' ? 'Retrieving and synthesizing transcripts...' : '')}</div>
-                {m.content.includes('[') && m.content.includes('§') ? (
-                  <button
-                    onClick={() => setSelectedCitation("Source verified: Matched from indexed Lenny's Podcast transcripts with citation references.")}
-                    className="mt-3 text-[11px] text-neutral-400 hover:text-[#F5F5F5] font-medium hover:underline flex items-center gap-1.5 transition-colors"
-                  >
-                    <span>✦</span> View Source Citation Details
-                  </button>
-                ) : null}
+                {/* Concept 1: Guest & Episode Mini-Badge Card */}
+                {m.role === 'assistant' && m.trace?.topSources?.[0] && (
+                  <div className="mb-1.5 flex items-center gap-2 px-1 text-[11px] text-neutral-400">
+                    <span className="w-5 h-5 rounded-full bg-neutral-800 border border-neutral-700 flex items-center justify-center text-[9px] font-bold text-[#F5F5F5]">
+                      🎙️
+                    </span>
+                    <span className="font-medium text-neutral-300">
+                      Lenny's Podcast — {m.trace.topSources[0].guest.toUpperCase()}
+                    </span>
+                    <span className="text-neutral-600">·</span>
+                    <span className="text-[10px] text-neutral-500 font-mono">
+                      section §{m.trace.topSources[0].position + 1}
+                    </span>
+                  </div>
+                )}
+
+                <div
+                  className={`max-w-2xl px-4 py-3.5 rounded-xl text-[13.5px] leading-relaxed ${
+                    m.role === 'user'
+                      ? 'bg-neutral-800 text-[#F5F5F5] border border-neutral-700 shadow-sm'
+                      : 'bg-surface-900 border border-neutral-800/90 text-neutral-200 shadow-sm'
+                  }`}
+                >
+                  <div className="whitespace-pre-wrap">{m.content || (loading && m.role === 'assistant' ? 'Retrieving and synthesizing transcripts...' : '')}</div>
+
+                  {/* Concept 2: RAG Inspection HUD Toggle */}
+                  {m.role === 'assistant' && hasTrace && (
+                    <div className="mt-3 pt-2.5 border-t border-neutral-800/80 flex items-center justify-between text-[11px]">
+                      <button
+                        onClick={() => setActiveTraceId(isTraceOpen ? null : m.id)}
+                        className="text-neutral-400 hover:text-[#F5F5F5] font-mono flex items-center gap-1 transition-colors"
+                      >
+                        <span>{isTraceOpen ? '▾' : '▸'}</span>
+                        <span>RAG Inspection HUD ({m.trace?.latencyMs}ms)</span>
+                      </button>
+                      <span className="text-neutral-600 font-mono text-[10px]">
+                        {m.trace?.chunksRetrieved} chunks evaluated
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Concept 2: Expandable HUD drawer */}
+                  {isTraceOpen && m.trace && (
+                    <div className="mt-2.5 p-3 rounded-lg bg-black/60 border border-neutral-800 font-mono text-[11px] space-y-2 text-neutral-300">
+                      <div className="grid grid-cols-2 gap-2 text-[10px] text-neutral-400 border-b border-neutral-800/80 pb-2">
+                        <div><strong className="text-neutral-200">Intent:</strong> {m.trace.intent}</div>
+                        <div><strong className="text-neutral-200">Provider:</strong> {m.trace.provider}</div>
+                        <div><strong className="text-neutral-200">Latency:</strong> {m.trace.latencyMs}ms</div>
+                        <div><strong className="text-neutral-200">Retrieved:</strong> {m.trace.chunksRetrieved} chunks</div>
+                      </div>
+                      <div className="text-[10px] text-neutral-400 font-semibold uppercase tracking-wider">Top Grounded Evidence Chunks:</div>
+                      {m.trace.topSources.map((src, idx) => (
+                        <div key={idx} className="bg-neutral-900/80 p-2 rounded border border-neutral-800/60 text-[10px]">
+                          <div className="flex justify-between text-neutral-300 mb-1">
+                            <span className="font-semibold text-[#F5F5F5]">#{idx + 1} {src.episode} (§{src.position})</span>
+                            <span className="text-neutral-500">score: {src.score}</span>
+                          </div>
+                          <p className="text-neutral-400 line-clamp-2 italic">"{src.snippet}"</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
           <div ref={messagesEndRef} />
         </div>
 
-        {selectedCitation && (
-          <div className="bg-neutral-900 border-t border-neutral-800 px-5 py-2.5 flex items-center justify-between text-xs text-[#F5F5F5] backdrop-blur">
-            <span>{selectedCitation}</span>
-            <button onClick={() => setSelectedCitation(null)} className="text-neutral-400 hover:text-[#F5F5F5] text-sm">✕</button>
-          </div>
-        )}
+        {/* Concept 4: Curated Lenny Growth Radar Pills */}
+        <div className="px-6 py-2 bg-surface-900/30 border-t border-neutral-800/60 overflow-x-auto flex gap-2 no-scrollbar">
+          {CURATED_TOPICS.map((topic, i) => (
+            <button
+              key={i}
+              onClick={() => handleSendMessage(topic.prompt)}
+              disabled={loading}
+              className="text-[11px] whitespace-nowrap bg-neutral-900 hover:bg-neutral-800 border border-neutral-800/90 text-neutral-400 hover:text-[#F5F5F5] px-2.5 py-1 rounded-full transition-all shadow-sm"
+            >
+              {topic.label}
+            </button>
+          ))}
+        </div>
 
-        <form onSubmit={handleSendMessage} className="p-4 border-t border-neutral-800/80 bg-surface-900/40 flex gap-2">
+        {/* Input bar */}
+        <form onSubmit={(e) => { e.preventDefault(); handleSendMessage(); }} className="p-4 border-t border-neutral-800/80 bg-surface-900/60 flex gap-2">
           <input
             type="text"
             value={input}
             onChange={e => setInput(e.target.value)}
-            placeholder="Ask across 250+ episodes or request an essay..."
+            placeholder="Ask across 250+ episodes or request a Ship 30 essay..."
             className="flex-1 bg-surface-900 border border-neutral-800 rounded-lg px-4 py-2.5 text-xs text-[#F5F5F5] placeholder-neutral-500 focus:outline-none focus:border-neutral-500 transition shadow-inner"
             disabled={loading}
           />
@@ -287,7 +375,7 @@ function App() {
         </form>
       </div>
 
-      {/* 3. Right Panel: Artifact Viewer */}
+      {/* 3. Right Panel: Artifact Viewer with Concept 3 Ship 30 Scorecard */}
       <div className="artifact-panel w-full md:w-96 p-4 bg-surface-900/80 flex flex-col">
         <div className="flex items-center justify-between mb-3 px-1">
           <h2 className="text-[11px] uppercase tracking-wider text-neutral-400 font-semibold">Artifact Viewer</h2>

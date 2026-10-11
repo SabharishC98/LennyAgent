@@ -15,19 +15,29 @@ interface Session {
 function App() {
   const [sessions, setSessions] = useState<Session[]>([{ id: 'default', title: 'Welcome Session' }]);
   const [currentSessionId, setCurrentSessionId] = useState('default');
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: 'welcome',
-      role: 'assistant',
-      content: 'Welcome! Ask a growth or PM question from Lenny’s Podcast, or ask me to write a Ship 30 essay.'
-    }
-  ]);
+  
+  // Per-session message storage
+  const [sessionMessages, setSessionMessages] = useState<Record<string, Message[]>>({
+    default: [
+      {
+        id: 'welcome',
+        role: 'assistant',
+        content: 'Welcome! Ask a growth or PM question from Lenny’s Podcast, or ask me to write a Ship 30 essay.'
+      }
+    ]
+  });
+
+  // Per-session artifact storage
+  const [sessionArtifacts, setSessionArtifacts] = useState<Record<string, string | null>>({});
+
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [config, setConfig] = useState({ provider: 'groq', model: 'llama-3.3-70b-versatile' });
-  const [artifactContent, setArtifactContent] = useState<string | null>(null);
   const [selectedCitation, setSelectedCitation] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const currentMessages = sessionMessages[currentSessionId] || [];
+  const currentArtifact = sessionArtifacts[currentSessionId] || null;
 
   useEffect(() => {
     fetch('/api/config')
@@ -40,21 +50,25 @@ function App() {
     if (typeof messagesEndRef.current?.scrollIntoView === 'function') {
       messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
-  }, [messages]);
+  }, [sessionMessages, currentSessionId]);
 
   const handleNewChat = () => {
     const newId = `session-${Date.now()}`;
     const newSession = { id: newId, title: `Chat ${sessions.length + 1}` };
+
     setSessions(prev => [newSession, ...prev]);
+    setSessionMessages(prev => ({
+      ...prev,
+      [newId]: [
+        {
+          id: `msg-${Date.now()}`,
+          role: 'assistant',
+          content: 'New chat started. What topic or guest would you like to explore?'
+        }
+      ]
+    }));
+    setSessionArtifacts(prev => ({ ...prev, [newId]: null }));
     setCurrentSessionId(newId);
-    setMessages([
-      {
-        id: `msg-${Date.now()}`,
-        role: 'assistant',
-        content: 'New chat started. What topic or guest would you like to explore?'
-      }
-    ]);
-    setArtifactContent(null);
   };
 
   const handleSendMessage = async (e?: React.FormEvent) => {
@@ -63,19 +77,41 @@ function App() {
     if (!query || loading) return;
 
     const userMsg: Message = { id: `user-${Date.now()}`, role: 'user', content: query };
-    setMessages(prev => [...prev, userMsg]);
+    const targetSessionId = currentSessionId;
+
+    // Update current session title if it's still default name
+    setSessions(prev =>
+      prev.map(s => {
+        if (s.id === targetSessionId && (s.title.startsWith('Chat ') || s.title === 'Welcome Session')) {
+          return { ...s, title: query.slice(0, 24) + (query.length > 24 ? '...' : '') };
+        }
+        return s;
+      })
+    );
+
+    setSessionMessages(prev => ({
+      ...prev,
+      [targetSessionId]: [...(prev[targetSessionId] || []), userMsg]
+    }));
+
     setInput('');
     setLoading(true);
 
     try {
-      const res = await fetch(`/api/sessions/${currentSessionId}/messages`, {
+      const res = await fetch(`/api/sessions/${targetSessionId}/messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: query })
       });
 
       if (!res.body) {
-        setMessages(prev => [...prev, { id: `err-${Date.now()}`, role: 'assistant', content: 'No response stream available.' }]);
+        setSessionMessages(prev => ({
+          ...prev,
+          [targetSessionId]: [
+            ...(prev[targetSessionId] || []),
+            { id: `err-${Date.now()}`, role: 'assistant', content: 'No response stream available.' }
+          ]
+        }));
         setLoading(false);
         return;
       }
@@ -85,7 +121,13 @@ function App() {
       let assistantText = '';
       const assistantMsgId = `assistant-${Date.now()}`;
 
-      setMessages(prev => [...prev, { id: assistantMsgId, role: 'assistant', content: '' }]);
+      setSessionMessages(prev => ({
+        ...prev,
+        [targetSessionId]: [
+          ...(prev[targetSessionId] || []),
+          { id: assistantMsgId, role: 'assistant', content: '' }
+        ]
+      }));
 
       while (true) {
         const { done, value } = await reader.read();
@@ -103,25 +145,41 @@ function App() {
               const payload = JSON.parse(rawData);
               if (payload.text) {
                 assistantText += payload.text;
-                setMessages(prev => prev.map(m => m.id === assistantMsgId ? { ...m, content: assistantText } : m));
+                setSessionMessages(prev => ({
+                  ...prev,
+                  [targetSessionId]: (prev[targetSessionId] || []).map(m =>
+                    m.id === assistantMsgId ? { ...m, content: assistantText } : m
+                  )
+                }));
               }
               if (payload.artifact) {
-                setArtifactContent(payload.artifact);
+                setSessionArtifacts(prev => ({
+                  ...prev,
+                  [targetSessionId]: payload.artifact
+                }));
               }
             } catch {
               if (rawData && rawData !== '[DONE]') {
                 assistantText += rawData;
-                setMessages(prev => prev.map(m => m.id === assistantMsgId ? { ...m, content: assistantText } : m));
+                setSessionMessages(prev => ({
+                  ...prev,
+                  [targetSessionId]: (prev[targetSessionId] || []).map(m =>
+                    m.id === assistantMsgId ? { ...m, content: assistantText } : m
+                  )
+                }));
               }
             }
           }
         }
       }
     } catch (err: any) {
-      setMessages(prev => [
+      setSessionMessages(prev => ({
         ...prev,
-        { id: `err-${Date.now()}`, role: 'assistant', content: `Error communicating with server: ${err?.message || err}` }
-      ]);
+        [targetSessionId]: [
+          ...(prev[targetSessionId] || []),
+          { id: `err-${Date.now()}`, role: 'assistant', content: `Error communicating with server: ${err?.message || err}` }
+        ]
+      }));
     } finally {
       setLoading(false);
     }
@@ -157,7 +215,6 @@ function App() {
 
       {/* 2. Middle Panel: Chat Stream */}
       <div className="chat-center flex-1 flex flex-col relative bg-gray-950 border-r border-gray-800">
-        {/* Header Badge */}
         <header className="border-b border-gray-800 px-6 py-3 flex items-center justify-between bg-gray-900/60 backdrop-blur">
           <div className="font-semibold text-gray-200">Lenny Growth Assistant</div>
           <div className="badge bg-gray-800 border border-gray-700 px-3 py-1 rounded-full text-xs text-gray-300">
@@ -165,9 +222,8 @@ function App() {
           </div>
         </header>
 
-        {/* Message Stream */}
         <div className="messages flex-1 overflow-y-auto p-6 space-y-4">
-          {messages.map(m => (
+          {currentMessages.map(m => (
             <div
               key={m.id}
               className={`flex flex-col ${m.role === 'user' ? 'items-end' : 'items-start'}`}
@@ -180,21 +236,20 @@ function App() {
                 }`}
               >
                 <div className="whitespace-pre-wrap">{m.content || (loading && m.role === 'assistant' ? 'Thinking...' : '')}</div>
-                {m.content.includes('[Guest - Episode') && (
+                {m.content.includes('[Guest') || m.content.includes('[ep0') ? (
                   <button
-                    onClick={() => setSelectedCitation("Episode metadata retrieved from indexed podcast corpus.")}
+                    onClick={() => setSelectedCitation("Episode metadata retrieved from indexed podcast transcript corpus.")}
                     className="mt-2 text-xs text-blue-400 hover:underline block"
                   >
                     View Citation Details
                   </button>
-                )}
+                ) : null}
               </div>
             </div>
           ))}
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Citation Drawer if selected */}
         {selectedCitation && (
           <div className="bg-gray-900 border-t border-blue-500/30 p-3 flex items-center justify-between text-xs text-gray-300">
             <span>{selectedCitation}</span>
@@ -202,7 +257,6 @@ function App() {
           </div>
         )}
 
-        {/* Input Bar */}
         <form onSubmit={handleSendMessage} className="p-4 border-t border-gray-800 bg-gray-900/50 flex gap-2">
           <input
             type="text"
@@ -226,7 +280,7 @@ function App() {
       <div className="artifact-panel w-full md:w-96 p-4 bg-gray-900/80 flex flex-col">
         <h2 className="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-3">Artifact Viewer</h2>
         <div className="flex-1 overflow-hidden">
-          <ArtifactViewer content={artifactContent || "<h2>No Artifact Yet</h2><p>Ask the assistant to write an essay or draft content to display an artifact preview here.</p>"} />
+          <ArtifactViewer content={currentArtifact || "<h2>No Artifact Yet</h2><p>Ask the assistant to write an essay or draft content to display an artifact preview here.</p>"} />
         </div>
       </div>
     </div>

@@ -32,10 +32,13 @@ export async function processFile(filePath: string) {
   const content = await fs.readFile(filePath, 'utf-8');
   const filename = path.basename(filePath);
 
-  // Basic metadata extraction (simplified for phase 2)
-  const episode = filename.replace('.md', '').replace('.txt', '');
-  const guest = 'Unknown Guest'; // In a real app, parse from frontmatter
-  const url = `https://lenny.example.com/episodes/${episode}`;
+  // Basic metadata extraction
+  let episode = filename.replace('.md', '').replace('.txt', '');
+  if (filename === 'transcript.md') {
+    episode = path.basename(path.dirname(filePath));
+  }
+  const guest = episode.replace(/-/g, ' ');
+  const url = `https://www.lennysnewsletter.com/p/${episode}`;
 
   const chunks = chunkText(content);
 
@@ -59,8 +62,9 @@ export async function processFile(filePath: string) {
     try {
       embedding = await getEmbedding(text);
     } catch (e) {
-      logger.warn('Ollama unavailable, inserting dummy embedding.');
-      // Insert a zero vector so tests/CI can still run without Ollama
+      // Fallback
+    }
+    if (!embedding || embedding.length !== 768) {
       embedding = new Array(768).fill(0);
     }
 

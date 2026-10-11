@@ -1,7 +1,6 @@
 import Fastify from 'fastify';
 import { logger } from './logger.js';
-import { FallbackManager } from './providers/index.js';
-import { OpenAICompatibleAdapter } from './providers/openai.js';
+import { FallbackManager, OpenAICompatibleAdapter, AnthropicAdapter } from './providers/index.js';
 import { routeIntent } from './router.js';
 import { answer_grounded } from './skills/answer_grounded.js';
 import { write_ship30_essay } from './skills/ship30.js';
@@ -15,29 +14,53 @@ app.get('/health', async (_req, reply) => {
 app.post('/agent/run', async (req: any, reply) => {
   const body = req.body || {};
   const query = body.query || body.message || 'What is product market fit?';
+  const history = Array.isArray(body.history) ? body.history : [];
 
+  // 1. Local Ollama (Mandatory for demo)
   const ollama = new OpenAICompatibleAdapter(
     process.env.OLLAMA_BASE_URL || 'http://host.docker.internal:11434',
     '',
     process.env.OLLAMA_MODEL || 'qwen2.5:7b'
   );
 
+  // 2. Groq (Cloud LLM)
   const groq = new OpenAICompatibleAdapter(
     'https://api.groq.com/openai/v1',
     process.env.GROQ_API_KEY || '',
     process.env.GROQ_MODEL || 'llama-3.3-70b-versatile'
   );
 
-  const fallbackProviders = process.env.GROQ_API_KEY ? [groq, ollama] : [ollama];
-  const manager = new FallbackManager(fallbackProviders);
+  // 3. Anthropic Claude (Optional Cloud SDK)
+  const anthropic = new AnthropicAdapter(
+    process.env.ANTHROPIC_API_KEY || '',
+    'claude-3-5-sonnet-20241022'
+  );
+
+  // Build provider chain according to environment configuration
+  const providerChain: { provider: any; name: string }[] = [];
+
+  const mainProvider = (process.env.LLM_PROVIDER || 'groq').toLowerCase();
+  if (mainProvider === 'anthropic' && process.env.ANTHROPIC_API_KEY) {
+    providerChain.push({ provider: anthropic, name: 'anthropic' });
+  } else if (mainProvider === 'groq' && process.env.GROQ_API_KEY) {
+    providerChain.push({ provider: groq, name: 'groq' });
+  }
+
+  // Fallback chain
+  if (process.env.GROQ_API_KEY && !providerChain.some(p => p.name === 'groq')) {
+    providerChain.push({ provider: groq, name: 'groq' });
+  }
+  providerChain.push({ provider: ollama, name: 'ollama' });
+
+  const manager = new FallbackManager(providerChain);
 
   const intent = await routeIntent(query);
   let responseText = '';
 
   if (intent === 'essay') {
-    responseText = await write_ship30_essay(query, null, manager);
+    responseText = await write_ship30_essay(query, null, manager, history);
   } else {
-    responseText = await answer_grounded(query, null, manager);
+    responseText = await answer_grounded(query, null, manager, history);
   }
 
   reply.raw.setHeader('Content-Type', 'text/event-stream');
@@ -47,7 +70,7 @@ app.post('/agent/run', async (req: any, reply) => {
   const chunkPayload = JSON.stringify({
     text: responseText,
     intent,
-    provider: process.env.GROQ_API_KEY ? 'groq' : 'ollama',
+    provider: providerChain[0]?.name || 'ollama',
     artifact: intent === 'essay' ? `<h1>Ship 30 Essay</h1><p>${responseText.replace(/\n\n/g, '</p><p>')}</p>` : null
   });
 

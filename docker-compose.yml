@@ -78,6 +78,9 @@ services:
     env_file: .env
     environment:
       DATABASE_URL: postgresql://lenny:lenny@db:5432/lenny
+      TRANSCRIPT_PATH: /transcripts
+    volumes:
+      - ../Lenny_Transcript:/transcripts:ro
     depends_on:
       db:
         condition: service_healthy

@@ -12,25 +12,25 @@ export class OpenAICompatibleAdapter implements LLMProvider {
   }
 
   async chat(messages: any[], options?: any): Promise<string> {
-    const res = await fetch(\\/chat/completions\, {
+    const res = await fetch(`${this.baseUrl}/chat/completions`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        ...(this.apiKey ? { Authorization: \Bearer \\ } : {})
+        ...(this.apiKey ? { Authorization: `Bearer ${this.apiKey}` } : {})
       },
       body: JSON.stringify({ model: this.model, messages, ...options }),
     });
     if (!res.ok) {
-       if (res.status === 429) {
-          const retryAfter = res.headers.get('Retry-After');
-          throw new Error(\Rate limit exceeded: 429. Retry-After: \\);
-       }
-       throw new Error(\Provider error: \\);
+      if (res.status === 429) {
+        const retryAfter = res.headers.get('Retry-After');
+        throw new Error(`Rate limit exceeded: 429. Retry-After: ${retryAfter}`);
+      }
+      throw new Error(`Provider error: ${res.statusText}`);
     }
     const data = await res.json();
     return data.choices[0].message.content;
   }
-  
+
   async *streamChat(messages: any[], options?: any): AsyncGenerator<string, void, unknown> {
     yield 'Streaming not fully implemented in mock yet';
   }

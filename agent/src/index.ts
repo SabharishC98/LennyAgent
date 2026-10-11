@@ -16,21 +16,21 @@ app.post('/agent/run', async (req: any, reply) => {
     '',
     process.env.OLLAMA_MODEL || 'qwen2.5:7b'
   );
-  
+
   const groq = new OpenAICompatibleAdapter(
-     'https://api.groq.com/openai/v1',
-     process.env.GROQ_API_KEY || '',
-     process.env.GROQ_MODEL || 'llama-3.3-70b-versatile'
+    'https://api.groq.com/openai/v1',
+    process.env.GROQ_API_KEY || '',
+    process.env.GROQ_MODEL || 'llama-3.3-70b-versatile'
   );
 
   const fallbackProviders = process.env.LLM_FALLBACK === 'ollama' ? [groq, ollama] : [ollama];
   const manager = new FallbackManager(fallbackProviders);
-  
+
   // Basic SSE format response (mocked)
   reply.raw.setHeader('Content-Type', 'text/event-stream');
   reply.raw.setHeader('Cache-Control', 'no-cache');
   reply.raw.setHeader('Connection', 'keep-alive');
-  
+
   reply.raw.write('data: {"text": "Processing your request..."}\n\n');
   reply.raw.write('data: [DONE]\n\n');
   reply.raw.end();
@@ -39,14 +39,12 @@ app.post('/agent/run', async (req: any, reply) => {
 const port = Number(process.env.AGENT_PORT ?? 8001);
 const host = process.env.AGENT_HOST ?? '0.0.0.0';
 
-if (import.meta.url === \ile://\ + process.argv[1]) {
-  app.listen({ port, host }, (err, address) => {
-    if (err) {
-      logger.error({ err }, 'Agent failed to start');
-      process.exit(1);
-    }
-    logger.info({ address }, 'Agent service started');
-  });
-}
-export { app };
+app.listen({ port, host }, (err, address) => {
+  if (err) {
+    logger.error({ err }, 'Agent failed to start');
+    process.exit(1);
+  }
+  logger.info({ address }, 'Agent service started');
+});
 
+export { app };

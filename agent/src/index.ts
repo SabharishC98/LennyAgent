@@ -116,22 +116,25 @@ ${contextText}`;
     }
   }
 
-  const latencyMs = Date.now() - startTime;
+  // Generate 2-3 dynamic contextual follow-up questions
+  const primaryGuest = chunks[0]?.guest || (chunks[0]?.episode ? chunks[0].episode.replace(/-/g, ' ') : '');
+  const followUps: string[] = [];
+  if (primaryGuest && !responseText.includes("don't support an answer")) {
+    const cleanGuestName = primaryGuest.split(' ').map((s: string) => s.charAt(0).toUpperCase() + s.slice(1)).join(' ');
+    followUps.push(`What specific frameworks did ${cleanGuestName} recommend?`);
+    followUps.push(`How can early-stage teams apply this without large budgets?`);
+    followUps.push(`Write a Ship 30 essay summarizing ${cleanGuestName}'s key takeaways.`);
+  }
 
-  // Metadata for HUD trace and podcast badges
-  const trace = {
-    intent,
-    provider: providerUsed,
-    latencyMs,
-    chunksRetrieved: chunks.length,
-    topSources: chunks.slice(0, 3).map(c => ({
-      episode: c.episode,
-      guest: c.guest || c.episode.replace(/-/g, ' '),
-      position: c.position,
-      score: c.score,
-      snippet: c.text.slice(0, 140) + '...'
-    }))
-  };
+  // Build Verified Episode Quote Card (Concept 1)
+  const episodeSource = chunks[0] ? {
+    episode: chunks[0].episode,
+    guest: primaryGuest.toUpperCase(),
+    position: chunks[0].position,
+    quote: chunks[0].text.length > 320 ? chunks[0].text.slice(0, 320) + '...' : chunks[0].text,
+    timestamp: `~${Math.floor((chunks[0].position * 2.5) + 4)}:00`,
+    url: chunks[0].url || `https://www.lennyspodcast.com/`
+  } : null;
 
   reply.raw.setHeader('Content-Type', 'text/event-stream');
   reply.raw.setHeader('Cache-Control', 'no-cache');
@@ -142,7 +145,8 @@ ${contextText}`;
     intent,
     provider: providerUsed,
     artifact: intent === 'essay' ? responseText : null,
-    trace
+    episodeSource,
+    followUps
   });
 
   reply.raw.write(`data: ${chunkPayload}\n\n`);

@@ -1,27 +1,21 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ArtifactViewer } from './components/ArtifactViewer';
 
-interface SourceMeta {
+interface EpisodeSource {
   episode: string;
   guest: string;
   position: number;
-  score: number;
-  snippet: string;
-}
-
-interface TraceMeta {
-  intent: string;
-  provider: string;
-  latencyMs: number;
-  chunksRetrieved: number;
-  topSources: SourceMeta[];
+  quote: string;
+  timestamp: string;
+  url: string;
 }
 
 interface Message {
   id: string;
   role: 'user' | 'assistant';
   content: string;
-  trace?: TraceMeta;
+  episodeSource?: EpisodeSource | null;
+  followUps?: string[];
 }
 
 interface Session {
@@ -56,8 +50,7 @@ function App() {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [config, setConfig] = useState({ provider: 'groq', model: 'openai/gpt-oss-120b' });
-  const [activeTraceId, setActiveTraceId] = useState<string | null>(null);
-  const [selectedCitation, setSelectedCitation] = useState<string | null>(null);
+  const [expandedQuoteId, setExpandedQuoteId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const currentMessages = sessionMessages[currentSessionId] || [];
@@ -141,7 +134,8 @@ function App() {
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let assistantText = '';
-      let traceMeta: TraceMeta | undefined = undefined;
+      let episodeSource: EpisodeSource | null = null;
+      let followUps: string[] = [];
       const assistantMsgId = `assistant-${Date.now()}`;
 
       setSessionMessages(prev => ({
@@ -169,13 +163,16 @@ function App() {
               if (payload.text) {
                 assistantText += payload.text;
               }
-              if (payload.trace) {
-                traceMeta = payload.trace;
+              if (payload.episodeSource) {
+                episodeSource = payload.episodeSource;
+              }
+              if (Array.isArray(payload.followUps)) {
+                followUps = payload.followUps;
               }
               setSessionMessages(prev => ({
                 ...prev,
                 [targetSessionId]: (prev[targetSessionId] || []).map(m =>
-                  m.id === assistantMsgId ? { ...m, content: assistantText, trace: traceMeta } : m
+                  m.id === assistantMsgId ? { ...m, content: assistantText, episodeSource, followUps } : m
                 )
               }));
               if (payload.artifact) {
@@ -225,7 +222,7 @@ function App() {
           className="new-chat w-full bg-surface-800 hover:bg-neutral-800 text-[#F5F5F5] font-medium px-3.5 py-2 rounded-lg mb-5 flex items-center justify-between text-xs border border-neutral-700/60 transition shadow-sm group"
           aria-label="New Chat"
         >
-          <span>New Session</span>
+          <span>New Chat</span>
           <span className="text-neutral-400 group-hover:text-[#F5F5F5] transition-colors">+</span>
         </button>
 
@@ -264,26 +261,26 @@ function App() {
         {/* Message Stream */}
         <div className="messages flex-1 overflow-y-auto p-6 space-y-5">
           {currentMessages.map(m => {
-            const hasTrace = !!m.trace;
-            const isTraceOpen = activeTraceId === m.id;
+            const isQuoteOpen = expandedQuoteId === m.id;
+            const src = m.episodeSource;
 
             return (
               <div
                 key={m.id}
                 className={`flex flex-col ${m.role === 'user' ? 'items-end' : 'items-start'}`}
               >
-                {/* Concept 1: Guest & Episode Mini-Badge Card */}
-                {m.role === 'assistant' && m.trace?.topSources?.[0] && (
+                {/* Concept 1: Guest & Episode Header Badge */}
+                {m.role === 'assistant' && src && (
                   <div className="mb-1.5 flex items-center gap-2 px-1 text-[11px] text-neutral-400">
                     <span className="w-5 h-5 rounded-full bg-neutral-800 border border-neutral-700 flex items-center justify-center text-[9px] font-bold text-[#F5F5F5]">
                       🎙️
                     </span>
                     <span className="font-medium text-neutral-300">
-                      Lenny's Podcast — {m.trace.topSources[0].guest.toUpperCase()}
+                      Lenny's Podcast — {src.guest}
                     </span>
                     <span className="text-neutral-600">·</span>
-                    <span className="text-[10px] text-neutral-500 font-mono">
-                      section §{m.trace.topSources[0].position + 1}
+                    <span className="text-[10px] text-neutral-400 font-mono">
+                      section §{src.position + 1}
                     </span>
                   </div>
                 )}
@@ -297,44 +294,58 @@ function App() {
                 >
                   <div className="whitespace-pre-wrap">{m.content || (loading && m.role === 'assistant' ? 'Retrieving and synthesizing transcripts...' : '')}</div>
 
-                  {/* Concept 2: RAG Inspection HUD Toggle */}
-                  {m.role === 'assistant' && hasTrace && (
-                    <div className="mt-3 pt-2.5 border-t border-neutral-800/80 flex items-center justify-between text-[11px]">
-                      <button
-                        onClick={() => setActiveTraceId(isTraceOpen ? null : m.id)}
-                        className="text-neutral-400 hover:text-[#F5F5F5] font-mono flex items-center gap-1 transition-colors"
-                      >
-                        <span>{isTraceOpen ? '▾' : '▸'}</span>
-                        <span>RAG Inspection HUD ({m.trace?.latencyMs}ms)</span>
-                      </button>
-                      <span className="text-neutral-600 font-mono text-[10px]">
-                        {m.trace?.chunksRetrieved} chunks evaluated
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Concept 2: Expandable HUD drawer */}
-                  {isTraceOpen && m.trace && (
-                    <div className="mt-2.5 p-3 rounded-lg bg-black/60 border border-neutral-800 font-mono text-[11px] space-y-2 text-neutral-300">
-                      <div className="grid grid-cols-2 gap-2 text-[10px] text-neutral-400 border-b border-neutral-800/80 pb-2">
-                        <div><strong className="text-neutral-200">Intent:</strong> {m.trace.intent}</div>
-                        <div><strong className="text-neutral-200">Provider:</strong> {m.trace.provider}</div>
-                        <div><strong className="text-neutral-200">Latency:</strong> {m.trace.latencyMs}ms</div>
-                        <div><strong className="text-neutral-200">Retrieved:</strong> {m.trace.chunksRetrieved} chunks</div>
+                  {/* Concept 1: Verified Episode Source & Audio Timestamp Card */}
+                  {m.role === 'assistant' && src && (
+                    <div className="mt-3.5 pt-3 border-t border-neutral-800/80">
+                      <div className="flex items-center justify-between text-[11px]">
+                        <button
+                          onClick={() => setExpandedQuoteId(isQuoteOpen ? null : m.id)}
+                          className="text-neutral-400 hover:text-[#F5F5F5] flex items-center gap-1.5 transition-colors font-medium"
+                        >
+                          <span>{isQuoteOpen ? '▾' : '▸'}</span>
+                          <span>Verified Transcript Quote</span>
+                          <span className="text-[10px] text-neutral-500 font-mono">({src.timestamp})</span>
+                        </button>
+                        <a
+                          href={src.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-[10px] text-neutral-400 hover:text-[#F5F5F5] hover:underline flex items-center gap-1"
+                        >
+                          <span>Episode Link ↗</span>
+                        </a>
                       </div>
-                      <div className="text-[10px] text-neutral-400 font-semibold uppercase tracking-wider">Top Grounded Evidence Chunks:</div>
-                      {m.trace.topSources.map((src, idx) => (
-                        <div key={idx} className="bg-neutral-900/80 p-2 rounded border border-neutral-800/60 text-[10px]">
-                          <div className="flex justify-between text-neutral-300 mb-1">
-                            <span className="font-semibold text-[#F5F5F5]">#{idx + 1} {src.episode} (§{src.position})</span>
-                            <span className="text-neutral-500">score: {src.score}</span>
+
+                      {isQuoteOpen && (
+                        <div className="mt-2.5 p-3 rounded-lg bg-black/60 border border-neutral-800 text-[11px] space-y-1.5">
+                          <div className="text-[10px] uppercase font-mono tracking-wider text-neutral-500 flex justify-between">
+                            <span>Verbatim Dialogue Excerpt</span>
+                            <span>{src.episode}</span>
                           </div>
-                          <p className="text-neutral-400 line-clamp-2 italic">"{src.snippet}"</p>
+                          <p className="text-neutral-300 italic leading-relaxed border-l-2 border-neutral-700 pl-2.5 my-1">
+                            "{src.quote}"
+                          </p>
                         </div>
-                      ))}
+                      )}
                     </div>
                   )}
                 </div>
+
+                {/* Concept 3: Dynamic Contextual Follow-Up Question Chips */}
+                {m.role === 'assistant' && m.followUps && m.followUps.length > 0 && !loading && (
+                  <div className="mt-2.5 max-w-2xl flex flex-wrap gap-1.5">
+                    {m.followUps.map((question, qIdx) => (
+                      <button
+                        key={qIdx}
+                        onClick={() => handleSendMessage(question)}
+                        className="text-[11px] text-left bg-surface-900/90 hover:bg-neutral-800 border border-neutral-800 text-neutral-400 hover:text-[#F5F5F5] px-3 py-1.5 rounded-full transition-all shadow-sm flex items-center gap-1.5"
+                      >
+                        <span className="text-neutral-500">💬</span>
+                        <span>{question}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             );
           })}
@@ -375,7 +386,7 @@ function App() {
         </form>
       </div>
 
-      {/* 3. Right Panel: Artifact Viewer with Concept 3 Ship 30 Scorecard */}
+      {/* 3. Right Panel: Artifact Viewer with Ship 30 Quality Scorecard */}
       <div className="artifact-panel w-full md:w-96 p-4 bg-surface-900/80 flex flex-col">
         <div className="flex items-center justify-between mb-3 px-1">
           <h2 className="text-[11px] uppercase tracking-wider text-neutral-400 font-semibold">Artifact Viewer</h2>

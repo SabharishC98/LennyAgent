@@ -1,37 +1,27 @@
 import React, { useState } from 'react';
 import DOMPurify from 'dompurify';
 
-// Converts common Markdown syntax into clean HTML
 function markdownToHtml(md: string): string {
-  // If it already contains HTML tags, return directly
   if (/<[a-z][\s\S]*>/i.test(md)) {
     return md;
   }
 
   let html = md
-    // Escape HTML special chars
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
-    // Headings
     .replace(/^### (.*$)/gim, '<h3>$1</h3>')
     .replace(/^## (.*$)/gim, '<h2>$1</h2>')
     .replace(/^# (.*$)/gim, '<h1>$1</h1>')
-    // Bold and italics
     .replace(/\*\*\*(.*?)\*\*\*/gim, '<strong><em>$1</em></strong>')
     .replace(/\*\*(.*?)\*\*/gim, '<strong>$1</strong>')
     .replace(/\*(.*?)\*/gim, '<em>$1</em>')
-    // Blockquotes
     .replace(/^\> (.*$)/gim, '<blockquote>$1</blockquote>')
-    // Inline code
     .replace(/`([^`]+)`/gim, '<code>$1</code>')
-    // Bullet lists
     .replace(/^\s*[-*]\s+(.*$)/gim, '<li>$1</li>');
 
-  // Wrap lists in <ul>
   html = html.replace(/(<li>[\s\S]*?<\/li>)/gim, '<ul>$1</ul>');
 
-  // Paragraphs for remaining text blocks
   html = html
     .split(/\n\s*\n/)
     .map(block => {
@@ -51,12 +41,10 @@ export const ArtifactViewer = ({ content }: { content: string }) => {
   const [activeTab, setActiveTab] = useState<'preview' | 'code'>('preview');
   const [copied, setCopied] = useState(false);
 
-  // 1. Transform markdown to HTML if markdown is detected
   const parsedHtml = markdownToHtml(content);
-
-  // 2. Sanitize through DOMPurify for strict defense-in-depth security
   const sanitized = DOMPurify.sanitize(parsedHtml, { USE_PROFILES: { html: true } });
 
+  // Minimalist warm-editorial typography
   const iframeSrc = `
     <!DOCTYPE html>
     <html>
@@ -64,27 +52,47 @@ export const ArtifactViewer = ({ content }: { content: string }) => {
         <meta charset="utf-8" />
         <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:;" />
         <style>
+          @import url('https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&family=Inter:wght@400;500;600&display=swap');
           body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            color: #1f2937;
-            line-height: 1.6;
-            padding: 20px;
+            font-family: 'Newsreader', Georgia, serif;
+            color: #262422;
+            line-height: 1.7;
+            font-size: 17px;
+            padding: 32px 28px;
             margin: 0;
-            background-color: #ffffff;
+            background-color: #fbf9f5;
           }
-          h1, h2, h3 { color: #111827; margin-top: 1.2em; margin-bottom: 0.6em; }
-          h1 { font-size: 1.5rem; border-bottom: 1px solid #e5e7eb; padding-bottom: 8px; }
-          h2 { font-size: 1.25rem; }
-          h3 { font-size: 1.1rem; }
-          p { margin: 0.8em 0; }
-          strong { color: #111827; }
-          em { color: #374151; }
-          ul, ol { padding-left: 24px; margin: 0.8em 0; }
-          li { margin-bottom: 4px; }
-          blockquote { border-left: 3px solid #3b82f6; padding-left: 12px; margin-left: 0; color: #4b5563; font-style: italic; }
-          pre, code { background: #f3f4f6; border-radius: 4px; font-family: monospace; }
-          pre { padding: 12px; overflow-x: auto; }
-          code { padding: 2px 4px; color: #dc2626; }
+          h1, h2, h3 { 
+            font-family: 'Inter', -apple-system, sans-serif;
+            color: #161514; 
+            letter-spacing: -0.02em;
+            margin-top: 1.4em; 
+            margin-bottom: 0.5em; 
+          }
+          h1 { font-size: 1.55rem; font-weight: 600; border-bottom: 1px solid #e7ded2; padding-bottom: 12px; }
+          h2 { font-size: 1.25rem; font-weight: 600; }
+          h3 { font-size: 1.05rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.04em; color: #78716c; }
+          p { margin: 1em 0; }
+          strong { font-family: 'Inter', sans-serif; font-weight: 600; color: #161514; }
+          em { font-style: italic; color: #44403c; }
+          ul, ol { padding-left: 24px; margin: 1em 0; }
+          li { margin-bottom: 6px; }
+          blockquote { 
+            border-left: 2px solid #d97706; 
+            padding-left: 16px; 
+            margin: 1.4em 0; 
+            color: #57534e; 
+            font-style: italic; 
+          }
+          pre, code { 
+            font-family: ui-monospace, SFMono-Regular, Menlo, monospace; 
+            font-size: 0.85em; 
+            background: #ede8df; 
+            border-radius: 4px; 
+          }
+          pre { padding: 14px; overflow-x: auto; }
+          code { padding: 2px 6px; color: #b45309; }
+          hr { border: 0; border-top: 1px solid #e7ded2; margin: 2em 0; }
         </style>
       </head>
       <body>${sanitized}</body>
@@ -111,26 +119,26 @@ export const ArtifactViewer = ({ content }: { content: string }) => {
   };
 
   return (
-    <div className="artifact-viewer w-full h-full flex flex-col bg-gray-900 border border-gray-800 rounded-xl overflow-hidden shadow-lg">
+    <div className="artifact-viewer w-full h-full flex flex-col bg-surface-900 border border-stone-800/60 rounded-xl overflow-hidden shadow-2xl">
       {/* Tab controls */}
-      <div className="tabs bg-gray-950 px-4 py-2 border-b border-gray-800 flex items-center justify-between">
-        <div className="flex gap-2">
+      <div className="tabs bg-surface-950/90 px-4 py-2.5 border-b border-stone-800/60 flex items-center justify-between backdrop-blur">
+        <div className="flex gap-1.5 p-0.5 bg-stone-900/80 rounded-lg border border-stone-800/50">
           <button
             onClick={() => setActiveTab('preview')}
-            className={`preview-tab text-xs font-medium px-3 py-1.5 rounded-md transition ${
+            className={`preview-tab text-xs font-medium px-3 py-1 rounded-md transition-all ${
               activeTab === 'preview'
-                ? 'bg-blue-600 text-white shadow'
-                : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800'
+                ? 'bg-stone-800 text-stone-100 shadow-sm'
+                : 'text-stone-400 hover:text-stone-200 hover:bg-stone-800/40'
             }`}
           >
             Preview
           </button>
           <button
             onClick={() => setActiveTab('code')}
-            className={`code-tab text-xs font-medium px-3 py-1.5 rounded-md transition ${
+            className={`code-tab text-xs font-medium px-3 py-1 rounded-md transition-all ${
               activeTab === 'code'
-                ? 'bg-blue-600 text-white shadow'
-                : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800'
+                ? 'bg-stone-800 text-stone-100 shadow-sm'
+                : 'text-stone-400 hover:text-stone-200 hover:bg-stone-800/40'
             }`}
           >
             Code
@@ -140,14 +148,14 @@ export const ArtifactViewer = ({ content }: { content: string }) => {
         <div className="flex items-center gap-2">
           <button
             onClick={handleCopy}
-            className="text-xs text-gray-400 hover:text-white bg-gray-800 hover:bg-gray-700 px-2.5 py-1 rounded border border-gray-700 transition"
+            className="text-xs text-stone-400 hover:text-stone-200 bg-stone-900 hover:bg-stone-850 px-2.5 py-1 rounded-md border border-stone-800/70 transition"
             title="Copy to clipboard"
           >
-            {copied ? 'Copied!' : 'Copy'}
+            {copied ? 'Copied' : 'Copy'}
           </button>
           <button
             onClick={handleDownload}
-            className="text-xs text-gray-400 hover:text-white bg-gray-800 hover:bg-gray-700 px-2.5 py-1 rounded border border-gray-700 transition"
+            className="text-xs text-stone-400 hover:text-stone-200 bg-stone-900 hover:bg-stone-850 px-2.5 py-1 rounded-md border border-stone-800/70 transition"
             title="Download file"
           >
             Download
@@ -156,7 +164,7 @@ export const ArtifactViewer = ({ content }: { content: string }) => {
       </div>
 
       {/* Content panel */}
-      <div className="flex-1 overflow-hidden relative bg-white">
+      <div className="flex-1 overflow-hidden relative bg-[#fbf9f5]">
         {activeTab === 'preview' ? (
           <iframe
             title="artifact-sandbox"
@@ -165,7 +173,7 @@ export const ArtifactViewer = ({ content }: { content: string }) => {
             className="w-full h-full border-0"
           />
         ) : (
-          <div className="w-full h-full overflow-auto bg-gray-950 p-4 text-xs font-mono text-gray-200 whitespace-pre-wrap select-all">
+          <div className="w-full h-full overflow-auto bg-surface-950 p-5 text-xs font-mono text-stone-300 whitespace-pre-wrap select-all leading-relaxed">
             {content}
           </div>
         )}

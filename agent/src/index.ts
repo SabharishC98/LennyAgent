@@ -17,8 +17,9 @@ app.post('/agent/run', async (req: any, reply) => {
   const history = Array.isArray(body.history) ? body.history : [];
 
   // 1. Local Ollama (Mandatory for demo)
+  const ollamaBaseUrl = (process.env.OLLAMA_BASE_URL || 'http://host.docker.internal:11434').replace(/\/+$/, '');
   const ollama = new OpenAICompatibleAdapter(
-    process.env.OLLAMA_BASE_URL || 'http://host.docker.internal:11434',
+    ollamaBaseUrl.endsWith('/v1') ? ollamaBaseUrl : `${ollamaBaseUrl}/v1`,
     '',
     process.env.OLLAMA_MODEL || 'qwen2.5:7b'
   );
@@ -36,19 +37,34 @@ app.post('/agent/run', async (req: any, reply) => {
     'claude-3-5-sonnet-20241022'
   );
 
-  // Build provider chain
+  // Support dynamic provider requested by client or fallback to env var
+  const requestedProvider = (body.provider || process.env.LLM_PROVIDER || 'groq').toLowerCase();
+
+  // Build provider chain according to requested provider
   const providerChain: { provider: any; name: string }[] = [];
-  const mainProvider = (process.env.LLM_PROVIDER || 'groq').toLowerCase();
-  if (mainProvider === 'anthropic' && process.env.ANTHROPIC_API_KEY) {
+  if (requestedProvider === 'ollama') {
+    providerChain.push({ provider: ollama, name: 'ollama' });
+    if (process.env.GROQ_API_KEY) {
+      providerChain.push({ provider: groq, name: 'groq' });
+    }
+  } else if (requestedProvider === 'anthropic' && process.env.ANTHROPIC_API_KEY) {
     providerChain.push({ provider: anthropic, name: 'anthropic' });
-  } else if (mainProvider === 'groq' && process.env.GROQ_API_KEY) {
-    providerChain.push({ provider: groq, name: 'groq' });
+    if (process.env.GROQ_API_KEY) {
+      providerChain.push({ provider: groq, name: 'groq' });
+    }
+    providerChain.push({ provider: ollama, name: 'ollama' });
+  } else {
+    // Default: Groq first
+    if (process.env.GROQ_API_KEY) {
+      providerChain.push({ provider: groq, name: 'groq' });
+    }
+    providerChain.push({ provider: ollama, name: 'ollama' });
   }
 
-  if (process.env.GROQ_API_KEY && !providerChain.some(p => p.name === 'groq')) {
-    providerChain.push({ provider: groq, name: 'groq' });
+  // Ensure ollama is always in fallback chain
+  if (!providerChain.some(p => p.name === 'ollama')) {
+    providerChain.push({ provider: ollama, name: 'ollama' });
   }
-  providerChain.push({ provider: ollama, name: 'ollama' });
 
   const manager = new FallbackManager(providerChain);
   const intent = await routeIntent(query);

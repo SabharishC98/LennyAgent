@@ -21,11 +21,12 @@ export class OpenAICompatibleAdapter implements LLMProvider {
       body: JSON.stringify({ model: this.model, messages, ...options }),
     });
     if (!res.ok) {
+      const errorBody = await res.text().catch(() => '');
       if (res.status === 429) {
         const retryAfter = res.headers.get('Retry-After');
         throw new Error(`Rate limit exceeded: 429. Retry-After: ${retryAfter}`);
       }
-      throw new Error(`Provider error: ${res.statusText}`);
+      throw new Error(`Provider error (${res.status}): ${res.statusText}. ${errorBody.slice(0, 200)}`);
     }
     const data = await res.json();
     return data.choices[0].message.content;

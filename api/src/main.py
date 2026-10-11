@@ -79,7 +79,51 @@ async def health_check() -> dict:
 
 @app.get("/config")
 async def get_config() -> dict:
-    return {"provider": settings.llm_provider, "fallback": settings.llm_fallback, "model": settings.groq_model, "phase": "6"}
+    has_groq = bool(settings.groq_api_key and settings.groq_api_key.strip())
+    has_anthropic = bool(settings.anthropic_api_key and settings.anthropic_api_key.strip())
+    
+    # Live check Ollama
+    ollama_online = False
+    try:
+        async with httpx.AsyncClient(timeout=2.0) as client:
+            resp = await client.get(f"{settings.ollama_base_url}/api/tags")
+            if resp.status_code == 200:
+                ollama_online = True
+    except Exception:
+        ollama_online = False
+
+    providers = [
+        {
+            "id": "groq",
+            "name": "Groq Cloud",
+            "model": settings.groq_model.replace("openai/", ""),
+            "available": has_groq,
+            "status": "online" if has_groq else "offline (no API key)"
+        },
+        {
+            "id": "ollama",
+            "name": "Local Ollama",
+            "model": settings.ollama_model,
+            "available": ollama_online,
+            "status": "online" if ollama_online else "offline (unreachable)"
+        },
+        {
+            "id": "anthropic",
+            "name": "Anthropic Claude",
+            "model": "claude-3-5-sonnet",
+            "available": has_anthropic,
+            "status": "online" if has_anthropic else "offline (no API key)"
+        }
+    ]
+
+    return {
+        "default_provider": settings.llm_provider,
+        "provider": settings.llm_provider,
+        "fallback": settings.llm_fallback,
+        "model": settings.groq_model,
+        "providers": providers,
+        "phase": "6"
+    }
 
 @app.get("/sessions")
 async def list_sessions() -> list[dict]:
@@ -128,13 +172,17 @@ async def get_messages(session_id: str) -> list[dict]:
         log.error("get_messages_db_failed", error=str(e))
         return []
 
-async def _proxy_agent_sse(client: httpx.AsyncClient, session_id: str, query_text: str, request_id: str, history: list[dict]):
+async def _proxy_agent_sse(client: httpx.AsyncClient, session_id: str, query_text: str, request_id: str, history: list[dict], provider: str | None = None):
     assistant_full_text = ""
+    payload = {"query": query_text, "history": history}
+    if provider:
+        payload["provider"] = provider
+
     try:
         async with client.stream(
             "POST", 
             f"{settings.agent_url}/agent/run", 
-            json={"query": query_text, "history": history}, 
+            json=payload, 
             headers={"x-request-id": request_id},
             timeout=60.0
         ) as response:
@@ -178,9 +226,11 @@ async def _proxy_agent_sse(client: httpx.AsyncClient, session_id: str, query_tex
 async def post_message(session_id: str, request: Request) -> StreamingResponse:
     request_id = request.headers.get("x-request-id", "unknown")
     query_text = ""
+    provider = None
     try:
         body = await request.json()
         query_text = body.get("message", "") or body.get("query", "")
+        provider = body.get("provider")
     except Exception:
         pass
 
@@ -213,7 +263,7 @@ async def post_message(session_id: str, request: Request) -> StreamingResponse:
             log.error("db_session_message_save_failed", error=str(e))
 
     client = httpx.AsyncClient()
-    return StreamingResponse(_proxy_agent_sse(client, session_id, query_text, request_id, history), media_type="text/event-stream")
+    return StreamingResponse(_proxy_agent_sse(client, session_id, query_text, request_id, history, provider=provider), media_type="text/event-stream")
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:

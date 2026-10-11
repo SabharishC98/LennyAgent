@@ -32,6 +32,14 @@ const CURATED_TOPICS = [
   { label: '✍️ Ship 30 Essay: Netflix Culture', prompt: 'Write a Ship 30 essay about how Netflix builds a culture of excellence from Elizabeth Stone.' }
 ];
 
+interface ProviderItem {
+  id: string;
+  name: string;
+  model: string;
+  available: boolean;
+  status: string;
+}
+
 function App() {
   const [sessions, setSessions] = useState<Session[]>([{ id: 'default', title: 'Welcome Session' }]);
   const [currentSessionId, setCurrentSessionId] = useState('default');
@@ -49,6 +57,12 @@ function App() {
   const [sessionArtifacts, setSessionArtifacts] = useState<Record<string, string | null>>({});
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [selectedProvider, setSelectedProvider] = useState<string>('groq');
+  const [providers, setProviders] = useState<ProviderItem[]>([
+    { id: 'groq', name: 'Groq Cloud', model: 'gpt-oss-120b', available: true, status: 'online' },
+    { id: 'ollama', name: 'Local Ollama', model: 'qwen2.5:7b', available: true, status: 'online' },
+    { id: 'anthropic', name: 'Anthropic Claude', model: 'claude-3-5-sonnet', available: false, status: 'offline (no API key)' }
+  ]);
   const [config, setConfig] = useState({ provider: 'groq', model: 'openai/gpt-oss-120b' });
   const [expandedQuoteId, setExpandedQuoteId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -59,7 +73,20 @@ function App() {
   useEffect(() => {
     fetch('/api/config')
       .then(res => res.json())
-      .then(data => setConfig({ provider: data.provider || 'groq', model: data.model || 'openai/gpt-oss-120b' }))
+      .then(data => {
+        if (data.providers && Array.isArray(data.providers)) {
+          setProviders(data.providers);
+          const initial = data.provider || data.default_provider || 'groq';
+          const isInitialAvailable = data.providers.find((p: ProviderItem) => p.id === initial && p.available);
+          if (isInitialAvailable) {
+            setSelectedProvider(initial);
+          } else {
+            const firstAvailable = data.providers.find((p: ProviderItem) => p.available);
+            if (firstAvailable) setSelectedProvider(firstAvailable.id);
+          }
+        }
+        setConfig({ provider: data.provider || 'groq', model: data.model || 'openai/gpt-oss-120b' });
+      })
       .catch(() => {});
   }, []);
 
@@ -116,7 +143,7 @@ function App() {
       const res = await fetch(`/api/sessions/${targetSessionId}/messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: query })
+        body: JSON.stringify({ message: query, provider: selectedProvider })
       });
 
       if (!res.body) {
@@ -253,8 +280,32 @@ function App() {
               7,500+ chunks indexed
             </span>
           </div>
-          <div className="badge bg-neutral-900 border border-neutral-800 px-2.5 py-1 rounded-md text-[11px] font-mono text-neutral-400">
-            {config.provider} · <span className="text-[#F5F5F5]">{config.model.replace('openai/', '')}</span>
+          <div className="flex items-center gap-2">
+            <div className="relative flex items-center">
+              <label htmlFor="llm-provider-select" className="sr-only">Select LLM Provider</label>
+              <select
+                id="llm-provider-select"
+                value={selectedProvider}
+                onChange={(e) => setSelectedProvider(e.target.value)}
+                disabled={loading}
+                className="bg-neutral-900 border border-neutral-700/80 hover:border-neutral-600 text-[#F5F5F5] text-[11px] font-mono rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-neutral-400 transition cursor-pointer disabled:opacity-50"
+              >
+                {providers.map((p) => (
+                  <option
+                    key={p.id}
+                    value={p.id}
+                    disabled={!p.available}
+                    className={p.available ? "bg-neutral-900 text-[#F5F5F5]" : "bg-neutral-950 text-neutral-500 italic"}
+                  >
+                    {p.name} ({p.model}) — {p.available ? '● Online' : `○ Offline: ${p.status}`}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-neutral-900 border border-neutral-800 text-[10px] font-mono text-neutral-400">
+              <span className={`w-1.5 h-1.5 rounded-full ${providers.find(p => p.id === selectedProvider)?.available ? 'bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.6)]' : 'bg-red-400'}`} />
+              <span className="uppercase text-neutral-300 font-semibold">{selectedProvider}</span>
+            </div>
           </div>
         </header>
 

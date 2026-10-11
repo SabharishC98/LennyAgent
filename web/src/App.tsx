@@ -310,9 +310,10 @@ function App() {
                           href={src.url}
                           target="_blank"
                           rel="noreferrer"
-                          className="text-[10px] text-neutral-400 hover:text-[#F5F5F5] hover:underline flex items-center gap-1"
+                          className="text-[10px] text-neutral-400 hover:text-[#F5F5F5] hover:underline flex items-center gap-1.5 font-medium px-2 py-0.5 rounded bg-neutral-800/60 border border-neutral-700/50 transition-colors"
                         >
-                          <span>Episode Link ↗</span>
+                          <span>▶</span>
+                          <span>{src.url.includes('youtube.com') ? 'Watch on YouTube ↗' : 'Episode Link ↗'}</span>
                         </a>
                       </div>
 

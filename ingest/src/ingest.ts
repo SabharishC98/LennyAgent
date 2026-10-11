@@ -37,8 +37,18 @@ export async function processFile(filePath: string) {
   if (filename === 'transcript.md') {
     episode = path.basename(path.dirname(filePath));
   }
-  const guest = episode.replace(/-/g, ' ');
-  const url = `https://www.lennysnewsletter.com/p/${episode}`;
+  let guest = episode.replace(/-/g, ' ');
+  let url = `https://www.youtube.com/@LennysPodcast`;
+
+  const ytMatch = content.match(/youtube_url:\s*([^\r\n]+)/);
+  if (ytMatch && ytMatch[1]) {
+    url = ytMatch[1].trim().replace(/^['"]|['"]$/g, '');
+  }
+
+  const guestMatch = content.match(/^guest:\s*([^\r\n]+)/m);
+  if (guestMatch && guestMatch[1]) {
+    guest = guestMatch[1].trim().replace(/^['"]|['"]$/g, '');
+  }
 
   const chunks = chunkText(content);
 

@@ -127,13 +127,29 @@ ${contextText}`;
   }
 
   // Build Verified Episode Quote Card (Concept 1)
+  const approxSeconds = Math.max(0, Math.floor((chunks[0]?.position || 0) * 150 + 240));
+  const rawUrl = chunks[0]?.url || 'https://www.youtube.com/@LennysPodcast';
+  const episodeUrl = rawUrl.includes('youtube.com/watch') && !rawUrl.includes('&t=')
+    ? `${rawUrl}&t=${approxSeconds}s`
+    : rawUrl;
+
+  let excerpt = chunks[0]?.text || '';
+  if (excerpt.startsWith('---')) {
+    const parts = excerpt.split('---');
+    if (parts.length >= 3) {
+      excerpt = parts.slice(2).join('---').trim();
+    }
+  }
+  const cleanExcerpt = excerpt.replace(/\s+/g, ' ').trim();
+  const quote = cleanExcerpt.length > 320 ? cleanExcerpt.slice(0, 320) + '...' : cleanExcerpt;
+
   const episodeSource = chunks[0] ? {
     episode: chunks[0].episode,
     guest: primaryGuest.toUpperCase(),
     position: chunks[0].position,
-    quote: chunks[0].text.length > 320 ? chunks[0].text.slice(0, 320) + '...' : chunks[0].text,
+    quote,
     timestamp: `~${Math.floor((chunks[0].position * 2.5) + 4)}:00`,
-    url: chunks[0].url || `https://www.lennyspodcast.com/`
+    url: episodeUrl
   } : null;
 
   reply.raw.setHeader('Content-Type', 'text/event-stream');

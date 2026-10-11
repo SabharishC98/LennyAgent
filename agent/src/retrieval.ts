@@ -18,7 +18,8 @@ export async function hybridRetrieve(query: string, activePool?: any): Promise<R
   // Strip stop words and task instructions from the query for clean keyword matching
   const stopWords = new Set([
     'write', 'an', 'essay', 'about', 'how', 'what', 'tell', 'me', 'the', 'from',
-    'guest', 'title', 'episode', 'build', 'builds', 'interview', 'podcast', 'with', 'and'
+    'guest', 'title', 'episode', 'build', 'builds', 'interview', 'podcast', 'with', 'and',
+    'say', 'said', 'does', 'did', 'think', 'talk', 'talks', 'discuss', 'explain', 'give'
   ]);
 
   const cleanWords = query
@@ -28,16 +29,15 @@ export async function hybridRetrieve(query: string, activePool?: any): Promise<R
     .filter((w) => w.length > 2 && !stopWords.has(w));
 
   try {
-    // 1. If we have specific search terms (like 'netflix', 'culture', 'excellence')
+    // 1. If we have specific search terms
     if (cleanWords.length > 0) {
-      // Build conditions counting how many query words match in text or episode name
-      // Weight matches in episode name heavily (3x) because user often specifies guest or topic
+      // Weight matches in episode slug or guest heavily (15x) so named guests always match their episode
       const matchScoreExpr = cleanWords
-        .map((_, i) => `(CASE WHEN text ILIKE '%' || $${i + 1} || '%' THEN 1 ELSE 0 END + CASE WHEN episode ILIKE '%' || $${i + 1} || '%' THEN 3 ELSE 0 END)`)
+        .map((_, i) => `(CASE WHEN text ILIKE '%' || $${i + 1} || '%' THEN 1 ELSE 0 END + CASE WHEN episode ILIKE '%' || $${i + 1} || '%' OR guest ILIKE '%' || $${i + 1} || '%' THEN 15 ELSE 0 END)`)
         .join(' + ');
 
       const filterConditions = cleanWords
-        .map((_, i) => `(text ILIKE '%' || $${i + 1} || '%' OR episode ILIKE '%' || $${i + 1} || '%')`)
+        .map((_, i) => `(text ILIKE '%' || $${i + 1} || '%' OR episode ILIKE '%' || $${i + 1} || '%' OR guest ILIKE '%' || $${i + 1} || '%')`)
         .join(' OR ');
 
       const querySql = `
@@ -47,7 +47,7 @@ export async function hybridRetrieve(query: string, activePool?: any): Promise<R
         WHERE (${filterConditions})
           AND path LIKE '%/episodes/%'
           AND episode != 'episodes' AND episode != 'README'
-        ORDER BY match_score DESC, position ASC
+        ORDER BY match_score DESC, (CASE WHEN position = 0 THEN 1 ELSE 0 END) ASC, position ASC
         LIMIT 6;
       `;
 

@@ -9,23 +9,19 @@ export default {
       },
       colors: {
         surface: {
-          50: '#faf8f5',
-          100: '#f4efe8',
-          200: '#e7ded2',
-          800: '#1e1c19',
-          850: '#161513',
-          900: '#11100e',
-          950: '#0c0b0a',
+          50: '#fafafa',
+          100: '#f5f5f5',
+          200: '#e5e5e5',
+          800: '#1e1e1e',
+          850: '#181818',
+          900: '#121212',
+          950: '#0a0a0a',
         },
-        accent: {
-          DEFAULT: '#d97706', // warm amber
-          light: '#f59e0b',
-          dark: '#b45309',
+        monochrome: {
+          light: '#f5f5f5',
+          DEFAULT: '#f5f5f5',
+          dark: '#e5e5e5',
         },
-        olive: {
-          DEFAULT: '#84937d',
-          dark: '#586952',
-        }
       },
     },
   },

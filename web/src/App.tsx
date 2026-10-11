@@ -183,25 +183,25 @@ function App() {
   };
 
   return (
-    <div className="min-h-screen bg-surface-950 text-stone-200 flex flex-col md:flex-row h-screen overflow-hidden selection:bg-amber-900/40 selection:text-amber-200 font-sans">
+    <div className="min-h-screen bg-surface-950 text-[#F5F5F5] flex flex-col md:flex-row h-screen overflow-hidden selection:bg-[#F5F5F5] selection:text-black font-sans">
       {/* 1. Left Sidebar: Sessions */}
-      <div className="session-list w-full md:w-64 border-r border-stone-800/60 p-4 flex flex-col bg-surface-900">
+      <div className="session-list w-full md:w-64 border-r border-neutral-800/80 p-4 flex flex-col bg-surface-900">
         {/* Brand Header */}
         <div className="flex items-center gap-2 px-1 mb-5">
-          <div className="w-2.5 h-2.5 rounded-full bg-amber-600 shadow-sm" />
-          <span className="text-xs font-medium tracking-wider uppercase text-stone-400">Lenny Assistant</span>
+          <div className="w-2 h-2 rounded-full bg-[#F5F5F5] shadow-[0_0_8px_rgba(245,245,245,0.4)]" />
+          <span className="text-xs font-medium tracking-wider uppercase text-neutral-400">Lenny Assistant</span>
         </div>
 
         <button
           onClick={handleNewChat}
-          className="new-chat w-full bg-stone-850 hover:bg-stone-800 text-stone-200 font-medium px-3.5 py-2 rounded-lg mb-5 flex items-center justify-between text-xs border border-stone-750 transition shadow-sm group"
+          className="new-chat w-full bg-surface-800 hover:bg-neutral-800 text-[#F5F5F5] font-medium px-3.5 py-2 rounded-lg mb-5 flex items-center justify-between text-xs border border-neutral-700/60 transition shadow-sm group"
           aria-label="New Chat"
         >
           <span>New Session</span>
-          <span className="text-stone-400 group-hover:text-amber-500 transition-colors">+</span>
+          <span className="text-neutral-400 group-hover:text-[#F5F5F5] transition-colors">+</span>
         </button>
 
-        <div className="text-[10px] uppercase tracking-widest text-stone-400 font-semibold mb-2.5 px-1">Recent Chats</div>
+        <div className="text-[10px] uppercase tracking-widest text-neutral-500 font-semibold mb-2.5 px-1">Recent Chats</div>
         <div className="overflow-y-auto flex-1 space-y-1 pr-1">
           {sessions.map(s => (
             <button
@@ -209,8 +209,8 @@ function App() {
               onClick={() => setCurrentSessionId(s.id)}
               className={`w-full text-left px-3 py-2 rounded-md text-xs truncate block transition ${
                 s.id === currentSessionId 
-                  ? 'bg-stone-800 text-amber-300 font-medium border-l-2 border-amber-600 pl-2.5' 
-                  : 'text-stone-400 hover:text-stone-200 hover:bg-stone-850/60'
+                  ? 'bg-neutral-800 text-[#F5F5F5] font-semibold border-l-2 border-[#F5F5F5] pl-2.5' 
+                  : 'text-neutral-400 hover:text-[#F5F5F5] hover:bg-surface-800/60'
               }`}
             >
               {s.title}
@@ -220,16 +220,16 @@ function App() {
       </div>
 
       {/* 2. Middle Panel: Chat Stream */}
-      <div className="chat-center flex-1 flex flex-col relative bg-surface-950 border-r border-stone-800/60">
-        <header className="border-b border-stone-800/60 px-6 py-3.5 flex items-center justify-between bg-surface-900/60 backdrop-blur">
+      <div className="chat-center flex-1 flex flex-col relative bg-surface-950 border-r border-neutral-800/80">
+        <header className="border-b border-neutral-800/80 px-6 py-3.5 flex items-center justify-between bg-surface-900/80 backdrop-blur">
           <div className="flex items-center gap-3">
-            <h1 className="text-sm font-semibold tracking-tight text-stone-100">Transcripts Knowledge Base</h1>
-            <span className="text-[10px] bg-stone-800/80 border border-stone-750 text-stone-400 px-2 py-0.5 rounded-full font-mono">
+            <h1 className="text-sm font-semibold tracking-tight text-[#F5F5F5]">Transcripts Knowledge Base</h1>
+            <span className="text-[10px] bg-neutral-800/80 border border-neutral-700/60 text-neutral-400 px-2 py-0.5 rounded-full font-mono">
               7,500+ chunks
             </span>
           </div>
-          <div className="badge bg-stone-900 border border-stone-800 px-2.5 py-1 rounded-md text-[11px] font-mono text-stone-400">
-            {config.provider} · <span className="text-stone-300">{config.model.replace('openai/', '')}</span>
+          <div className="badge bg-neutral-900 border border-neutral-800 px-2.5 py-1 rounded-md text-[11px] font-mono text-neutral-400">
+            {config.provider} · <span className="text-[#F5F5F5]">{config.model.replace('openai/', '')}</span>
           </div>
         </header>
 
@@ -242,15 +242,15 @@ function App() {
               <div
                 className={`max-w-2xl px-4 py-3.5 rounded-xl text-[13.5px] leading-relaxed ${
                   m.role === 'user'
-                    ? 'bg-stone-800 text-stone-100 border border-stone-700/60 shadow-sm'
-                    : 'bg-surface-900 border border-stone-800/70 text-stone-200 shadow-sm'
+                    ? 'bg-neutral-800 text-[#F5F5F5] border border-neutral-700 shadow-sm'
+                    : 'bg-surface-900 border border-neutral-800/90 text-neutral-200 shadow-sm'
                 }`}
               >
                 <div className="whitespace-pre-wrap">{m.content || (loading && m.role === 'assistant' ? 'Retrieving and synthesizing transcripts...' : '')}</div>
                 {m.content.includes('[') && m.content.includes('§') ? (
                   <button
                     onClick={() => setSelectedCitation("Source verified: Matched from indexed Lenny's Podcast transcripts with citation references.")}
-                    className="mt-3 text-[11px] text-amber-500/90 hover:text-amber-400 font-medium hover:underline flex items-center gap-1"
+                    className="mt-3 text-[11px] text-neutral-400 hover:text-[#F5F5F5] font-medium hover:underline flex items-center gap-1.5 transition-colors"
                   >
                     <span>✦</span> View Source Citation Details
                   </button>
@@ -262,25 +262,25 @@ function App() {
         </div>
 
         {selectedCitation && (
-          <div className="bg-stone-900/90 border-t border-amber-900/30 px-5 py-2.5 flex items-center justify-between text-xs text-amber-200/90 backdrop-blur">
+          <div className="bg-neutral-900 border-t border-neutral-800 px-5 py-2.5 flex items-center justify-between text-xs text-[#F5F5F5] backdrop-blur">
             <span>{selectedCitation}</span>
-            <button onClick={() => setSelectedCitation(null)} className="text-stone-400 hover:text-stone-200 text-sm">✕</button>
+            <button onClick={() => setSelectedCitation(null)} className="text-neutral-400 hover:text-[#F5F5F5] text-sm">✕</button>
           </div>
         )}
 
-        <form onSubmit={handleSendMessage} className="p-4 border-t border-stone-800/60 bg-surface-900/40 flex gap-2">
+        <form onSubmit={handleSendMessage} className="p-4 border-t border-neutral-800/80 bg-surface-900/40 flex gap-2">
           <input
             type="text"
             value={input}
             onChange={e => setInput(e.target.value)}
             placeholder="Ask across 250+ episodes or request an essay..."
-            className="flex-1 bg-surface-900 border border-stone-800 rounded-lg px-4 py-2.5 text-xs text-stone-100 placeholder-stone-400 focus:outline-none focus:border-amber-700/60 transition shadow-inner"
+            className="flex-1 bg-surface-900 border border-neutral-800 rounded-lg px-4 py-2.5 text-xs text-[#F5F5F5] placeholder-neutral-500 focus:outline-none focus:border-neutral-500 transition shadow-inner"
             disabled={loading}
           />
           <button
             type="submit"
             disabled={loading || !input.trim()}
-            className="bg-amber-600 hover:bg-amber-500 disabled:opacity-40 text-stone-950 font-semibold px-4 py-2.5 rounded-lg text-xs transition shadow-sm"
+            className="bg-[#F5F5F5] hover:bg-white disabled:opacity-30 text-black font-semibold px-4 py-2.5 rounded-lg text-xs transition shadow-sm"
           >
             {loading ? 'Synthesizing...' : 'Send'}
           </button>
@@ -288,10 +288,10 @@ function App() {
       </div>
 
       {/* 3. Right Panel: Artifact Viewer */}
-      <div className="artifact-panel w-full md:w-96 p-4 bg-surface-900/70 flex flex-col">
+      <div className="artifact-panel w-full md:w-96 p-4 bg-surface-900/80 flex flex-col">
         <div className="flex items-center justify-between mb-3 px-1">
-          <h2 className="text-[11px] uppercase tracking-wider text-stone-400 font-semibold">Artifact Viewer</h2>
-          <span className="text-[10px] text-stone-400 font-mono">Ship 30 & Docs</span>
+          <h2 className="text-[11px] uppercase tracking-wider text-neutral-400 font-semibold">Artifact Viewer</h2>
+          <span className="text-[10px] text-neutral-500 font-mono">Ship 30 & Docs</span>
         </div>
         <div className="flex-1 overflow-hidden">
           <ArtifactViewer content={currentArtifact || "<h2>No Artifact Yet</h2><p>Ask the assistant to write an essay or draft content to display an artifact preview here.</p>"} />

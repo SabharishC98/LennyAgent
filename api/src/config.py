@@ -21,7 +21,7 @@ class Settings(BaseSettings):
 
     # Groq
     groq_api_key: str = ""
-    groq_model: str = "llama-3.3-70b-versatile"
+    groq_model: str = "openai/gpt-oss-120b"
 
     # Ollama
     ollama_base_url: str = "http://host.docker.internal:11434"

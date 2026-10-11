@@ -27,7 +27,7 @@ app.post('/agent/run', async (req: any, reply) => {
   const groq = new OpenAICompatibleAdapter(
     'https://api.groq.com/openai/v1',
     process.env.GROQ_API_KEY || '',
-    process.env.GROQ_MODEL || 'llama-3.3-70b-versatile'
+    process.env.GROQ_MODEL || 'openai/gpt-oss-120b'
   );
 
   // 3. Anthropic Claude (Optional Cloud SDK)

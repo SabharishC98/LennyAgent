@@ -44,10 +44,6 @@ export const ArtifactViewer = ({ content }: { content: string }) => {
   // Compute live Ship 30 scorecard metrics
   const wordCount = content.trim().split(/\s+/).filter(Boolean).length;
   const readingTimeMin = Math.max(1, Math.ceil(wordCount / 225));
-  const hasHook = /hook/i.test(content) || /^\*\*[^*]+\*\*/m.test(content);
-  const hasHeadings = /^#{1,3}\s/m.test(content) || /<h[1-3]>/i.test(content);
-  const hasTakeaway = /takeaway|conclusion|action/i.test(content);
-  const hasCitations = /\[|§|sources/i.test(content);
 
   const parsedHtml = markdownToHtml(content);
   const sanitized = DOMPurify.sanitize(parsedHtml, { USE_PROFILES: { html: true } });
@@ -140,21 +136,6 @@ export const ArtifactViewer = ({ content }: { content: string }) => {
           <div className="flex items-center gap-1 text-neutral-400 font-mono">
             <span>⏱</span> {readingTimeMin} min read
           </div>
-        </div>
-
-        <div className="flex items-center gap-2 text-[10px]">
-          <span className={`px-1.5 py-0.5 rounded ${hasHook ? 'bg-neutral-800 text-[#F5F5F5]' : 'text-neutral-600'}`}>
-            {hasHook ? '✓ Hook' : '○ Hook'}
-          </span>
-          <span className={`px-1.5 py-0.5 rounded ${hasHeadings ? 'bg-neutral-800 text-[#F5F5F5]' : 'text-neutral-600'}`}>
-            {hasHeadings ? '✓ Structure' : '○ Structure'}
-          </span>
-          <span className={`px-1.5 py-0.5 rounded ${hasTakeaway ? 'bg-neutral-800 text-[#F5F5F5]' : 'text-neutral-600'}`}>
-            {hasTakeaway ? '✓ Takeaway' : '○ Takeaway'}
-          </span>
-          <span className={`px-1.5 py-0.5 rounded ${hasCitations ? 'bg-neutral-800 text-[#F5F5F5]' : 'text-neutral-600'}`}>
-            {hasCitations ? '✓ Grounded' : '○ Grounded'}
-          </span>
         </div>
       </div>
 

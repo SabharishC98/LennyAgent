@@ -47,5 +47,7 @@ ${top.text}
 Focus relentlessly on getting users to return before pouring resources into top-of-funnel acquisition.
 
 Sources:
-- [${top.episode}, section ${top.position + 1}]`;
+- [${top.episode}, section ${top.position + 1}]
+
+Notice: This essay may not strictly meet the 1150-1350 word count requirement due to provider constraints.`;
 }

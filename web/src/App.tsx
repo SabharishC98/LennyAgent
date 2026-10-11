@@ -31,10 +31,10 @@ interface Session {
 
 // Concept 4: Curated Lenny Growth Radar Topics
 const CURATED_TOPICS = [
-  { label: '🚀 Growth Loops vs Funnels', prompt: 'Explain the difference between growth loops and traditional funnels from Lenny\'s guests like Elena Verna.' },
+  { label: '🚀 Elena Verna on Product-Led Sales', prompt: 'What does Elena Verna explain about product-led sales and self-serve monetization?' },
   { label: '🎯 Rahul Vohra\'s PMF Engine', prompt: 'How does Rahul Vohra\'s Superhuman engine algorithmically measure and optimize product market fit?' },
-  { label: '👑 Founder Mode', prompt: 'What did Brian Chesky say about founder mode and maintaining hands-on product details?' },
-  { label: '📈 B2B Retention Benchmarks', prompt: 'What are the key B2B SaaS retention benchmarks discussed across Lenny\'s podcast episodes?' },
+  { label: '👑 Founder Mode & Product Details', prompt: 'What did Brian Chesky say about founder mode and maintaining hands-on product details?' },
+  { label: '📈 Airtable Growth & Retention', prompt: 'What unconventional growth and retention strategies did Zoelle Egner share from Airtable?' },
   { label: '✍️ Ship 30 Essay: Netflix Culture', prompt: 'Write a Ship 30 essay about how Netflix builds a culture of excellence from Elizabeth Stone.' }
 ];
 

@@ -91,6 +91,7 @@ Follow Ship 30 for 30 principles:
       responseText = `# How to Master Growth: Insights from Lenny's Podcast\n\n**Hook:** Most product teams overcomplicate growth before nailing their fundamentals.\n\n## The Core Metric: Retention\n${top.text}\n\n## Key Takeaway\nFocus relentlessly on getting users to return before pouring resources into top-of-funnel acquisition.\n\nSources:\n- [${top.episode}, section ${top.position + 1}]\n\nNotice: This essay may not strictly meet the 1150-1350 word count requirement due to provider constraints.`;
     }
   } else {
+    const contextText = chunks.map((c, i) => `[Evidence ${i + 1} - ${c.episode}, §${c.position + 1}]:\n${c.text}`).join('\n\n');
     const systemPrompt = `You are Lenny Growth Assistant, an expert answering questions strictly grounded in Lenny's Podcast transcripts.
 Synthesize a clear, informative answer based directly on the provided podcast evidence.
 Always cite your evidence inline using the format: [Guest/Topic - Episode, §n].

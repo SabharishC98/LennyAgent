@@ -155,4 +155,4 @@ make test
 
 ## 📹 Demo Video
 
-- **Video Link:** [YouTube Demo Link](https://www.youtube.com/watch?v=placeholder) *(Camera on, 2–3 minutes covering problem statement, verified citation Q&A, Ship 30 essay generation, sandboxed artifact viewer, and Ollama offline toggle).*
+- **Video Link:** [(https://youtu.be/kNIcDjWCEWo)](https://www.youtube.com/watch?v=placeholder) *(Camera on, 2–3 minutes covering problem statement, verified citation Q&A, Ship 30 essay generation, sandboxed artifact viewer, and Ollama offline toggle).*
